@@ -57,5 +57,5 @@ def summarize(file_path: str | Path) -> None:
 
 
 if __name__ == "__main__":
-    target = sys.argv[1] if len(sys.argv) > 1 else "parul_aggarwal/eval_set/questions.jsonl"
+    target = sys.argv[1] if len(sys.argv) > 1 else "eval_set/questions.jsonl"
     summarize(target)

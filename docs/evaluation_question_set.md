@@ -1,8 +1,7 @@
 # Held-Out Evaluation Question Set & Ground Truth: Methodology and Guide
 
-**Owner:** Parul Aggarwal (230540)  
-**Deliverable Window:** Weeks 2-3  
-**Artifacts:** `parul_aggarwal/eval_set/questions.jsonl`, `validator.py`, `summary.py`, `generate_eval_set.py`, `heldout_hash.sha256`, `labelling_guide.md`
+**Component:** Evaluation Question Set & Ground Truth Benchmark  
+**Artifacts:** `eval_set/questions.jsonl`, `validator.py`, `summary.py`, `generate_eval_set.py`, `heldout_hash.sha256`, `labelling_guide.md`
 
 ---
 
@@ -49,7 +48,7 @@ The validator enforces:
 6. **Heldout Hash Verification**: Computes the canonical SHA-256 digest of held-out records and compares against `heldout_hash.sha256`.
 
 ### 3.2 Canonical Frozen Digest
-- **Heldout SHA-256 Digest**: `db17a0274ab504ab0b987e09eeb28877e6db1082ba4624dd348304c9e00fd655`
+- **Heldout SHA-256 Digest**: `60ef81c897767b20b1e7756278af631c5cdebdb4a8628b8ed3b7b9986e1d37eb`
 - Generated deterministically by `generate_eval_set.py` using canonical sorted-key JSON serialization.
 
 ---
@@ -59,12 +58,12 @@ The validator enforces:
 1. **Evidence Mix & Multi-Source Coverage**: 34 unique evidence items are git commits, with 3 PR/issue items (`pr:420`, `pr:5`, `issue:SELFOUR-501`) and 4 multi-source questions (`Q001`, `Q003`, `Q006`, `Q024`). The evaluation emphasizes commit log rationale and code evolution.
 2. **Legacy & Bitbucket Identifiers**: `issue:SELFOUR-501` references a Jira issue from seL4s initial open-source release; `pr:420` corresponds to a Bitbucket pull request merge (`bca46830e`) before seL4 migrated to GitHub. These exist in git commit messages and merge histories, but cannot be fetched via GitHub REST API v3.
 3. **No Embedded Solution IDs in Questions**: All questions are formulated naturally without giving away commit hashes or PR numbers (e.g. Q006 asks about Cortex-A15 errata moving to C; Q021 asks about the reply-receive fastpath slowpath bailout without embedding the commit hash).
-4. **Corpus Temporal Coverage**: Questions use commits up to October 16, 2026. Teammates creating index snapshots (Parul Guptas hybrid retriever) must ensure their repository corpus includes commits through October 16, 2026.
-5. **Validation Verification**: 100% of cited commit SHAs exist and have been programmatically verified against `seL4.git`. Ground-truth reference answers and key facts have been verified against commit messages and diffs by author Parul Aggarwal (230540).
+4. **Corpus Temporal Coverage**: Questions use commits up to October 16, 2026. Subsystems creating index snapshots (e.g. hybrid retrieval indices) must ensure their repository corpus includes commits through October 16, 2026.
+5. **Validation Verification**: 100% of cited commit SHAs exist and have been programmatically verified against `seL4.git`. Ground-truth reference answers and key facts have been verified against commit messages and diffs in the seL4 repository history.
 
 ---
 
-## 5. Definition of Done Checklist
+## 5. Verification Checklist
 
 - [x] Target repository agreed and verified as `seL4`
 - [x] 35 questions created adhering strictly to the JSON schema (4 valid question types)

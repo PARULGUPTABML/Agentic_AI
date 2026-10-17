@@ -1,8 +1,7 @@
-# Four Coordination Architecture Patterns: Methodology and Build Guide
+# Four Coordination Architecture Patterns: Methodology and Guide
 
-**Owner:** Parul Aggarwal (230540)  
-**Deliverable Window:** Weeks 6-9  
-**Artifacts:** `parul_aggarwal/architectures/base.py`, `sequential.py`, `hierarchical.py`, `event_driven.py`, `workflow_dag.py`, `tests/test_architectures.py`
+**Component:** Coordination Architecture Patterns  
+**Artifacts:** `architectures/base.py`, `sequential.py`, `hierarchical.py`, `event_driven.py`, `workflow_dag.py`, `tests/test_architectures.py`
 
 ---
 
@@ -49,15 +48,15 @@ The objective is to compare four coordination patterns empirically on latency, a
 
 ## 3. Parity Testing and Empirical Results
 
-In `parul_aggarwal/tests/test_architectures.py`, all four variants were evaluated across dev questions from real seL4 history with deterministic stubs:
-- **Correctness:** 100% of runs produced valid answers adhering to the template with zero invalid citations.
+In `tests/test_architectures.py`, all four variants are evaluated across dev questions from real seL4 history with deterministic stubs:
+- **Correctness:** 100% of runs produce valid answers adhering to the template with zero invalid citations.
 - **Plan Fidelity:** Sequential confirmed to only invoke planned agents (e.g. for authorship queries, invokes only `history_rag` and `issue_pr`).
 - **Round Limiting:** Verified that all 4 variants terminate cleanly at `MAX_ROUNDS` on adversarial insufficient evidence.
 - **Overhead:** Coordination overhead verified to be honest and non-exceeding total elapsed time across all variants.
 
 ---
 
-## 4. Definition of Done Checklist
+## 4. Verification Checklist
 
 - [x] Shared base module and common interface implemented (`base.py`)
 - [x] All 4 variants implemented behind identical `run()` entry point

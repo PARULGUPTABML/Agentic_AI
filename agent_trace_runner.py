@@ -47,7 +47,7 @@ def generate_demo_trace():
         "meta": {
             "timestamp": datetime.now().isoformat(),
             "project": "Repository-Aware Multi-Agent AI",
-            "student": "Parul Gupta — 230506",
+            "framework": "Multi-Agent System",
             "llm_provider": os.environ.get("LLM_PROVIDER", "mock"),
         },
         "scenarios": []

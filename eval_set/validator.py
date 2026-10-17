@@ -222,7 +222,7 @@ def validate_file(
 
 def main():
     parser = argparse.ArgumentParser(description="Validate evaluation question set.")
-    parser.add_argument("file", nargs="?", default="parul_aggarwal/eval_set/questions.jsonl", help="Path to questions.jsonl")
+    parser.add_argument("file", nargs="?", default="eval_set/questions.jsonl", help="Path to questions.jsonl")
     parser.add_argument("--git-dir", help="Path to seL4 git directory for SHA verification")
     parser.add_argument("--require-git", action="store_true", help="Fail if git directory is not found")
     args = parser.parse_args()

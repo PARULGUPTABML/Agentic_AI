@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from agents.blackboard import Blackboard, BlackboardStatus
-from parul_aggarwal.architectures.base import (
+from architectures.base import (
     Architecture,
     StubRetrievalAgent,
     StubVerificationAgent,

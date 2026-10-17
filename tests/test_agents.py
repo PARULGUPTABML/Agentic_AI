@@ -1,4 +1,4 @@
-"""Tests for the multi-agent system (Parul Gupta's agents).
+"""Tests for the multi-agent system retrieval and verification pipeline.
 
 Run with:
     cd backend

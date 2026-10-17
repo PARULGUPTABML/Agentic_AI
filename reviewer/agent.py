@@ -13,8 +13,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set
 
-from parul_aggarwal.reviewer.citation_checker import check_citations, extract_citations
-from parul_aggarwal.reviewer.renderer import render_template
+from reviewer.citation_checker import check_citations, extract_citations
+from reviewer.renderer import render_template
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +223,7 @@ class ReviewerAgent:
         sanitized_claims, citation_stats = check_citations(claims, valid_evidence_ids)
 
         # Strip invalid citations and cleanup punctuation in answer_text
-        from parul_aggarwal.reviewer.citation_checker import sanitize_text_artifacts
+        from reviewer.citation_checker import sanitize_text_artifacts
 
         evidence_claims = [c for c in sanitized_claims if c.get("type") == "evidence"]
         if evidence_claims and any(c.get("type") == "inference" for c in sanitized_claims):

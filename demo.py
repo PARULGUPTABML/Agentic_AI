@@ -1,6 +1,6 @@
 """
 ╔══════════════════════════════════════════════════════════════╗
-║  LIVE DEMO: Multi-Agent System — Parul Gupta                ║
+║  LIVE DEMO: Multi-Agent System Architecture                 ║
 ║  Shows how agents work step-by-step with visible output     ║
 ╚══════════════════════════════════════════════════════════════╝
 
@@ -439,10 +439,9 @@ def demo_cot_explained():
 def main():
     banner("AGENTIC AI — Multi-Agent System Demo", "═")
     print("""
-  Parul Gupta — 230506
   Repository-Aware Multi-Agent AI for Software History
 
-  This demo shows how your 2 agents + Blackboard work together.
+  This demo shows how the multi-agent pipeline and Blackboard work together.
   Using MOCK LLM — no API keys needed!
     """)
 

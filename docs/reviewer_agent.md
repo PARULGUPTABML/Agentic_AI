@@ -1,14 +1,13 @@
 # Reviewer / Final Response Agent: Methodology and Build Guide
 
-**Owner:** Parul Aggarwal (230540)  
-**Deliverable Window:** Weeks 5-6  
-**Artifacts:** `parul_aggarwal/reviewer/agent.py`, `citation_checker.py`, `renderer.py`, `prompts/reviewer_system.md`, `prompts/reviewer_entailment.md`, `tests/test_reviewer.py`
+**Component:** Reviewer / Final Response Agent  
+**Artifacts:** `reviewer/agent.py`, `citation_checker.py`, `renderer.py`, `prompts/reviewer_system.md`, `prompts/reviewer_entailment.md`, `tests/test_reviewer.py`
 
 ---
 
 ## 1. Purpose & Scope
 
-The Reviewer Agent is the final step of the multi-agent pipeline:
+The Reviewer Agent is the final synthesis step of the multi-agent pipeline:
 - Turns approved repository evidence into a clear, factual explanation for the developer.
 - Ensures every factual claim carries inline citations pointing to valid evidence IDs.
 - Strictly isolates inferences from factual statements.
@@ -50,11 +49,11 @@ Gaps and Confidence
 
 ---
 
-## 4. Definition of Done Checklist
+## 4. Verification Checklist
 
 - [x] Citation validity is 100% after programmatic checking (invalid citations removed or downgraded)
 - [x] Zero invented inferences on unrelated or empty evidence items
-- [x] Template renderer conforms strictly to section 5 format
+- [x] Template renderer conforms strictly to standard format
 - [x] Adversarial tests pass (empty evidence, incomplete flag, dropped malformed items)
 - [x] Entailment check flag supported
 - [x] Blackboard integration tested (`BlackboardStatus.DONE`, final answer, logs)

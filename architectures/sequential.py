@@ -1,28 +1,23 @@
-"""Variant 4: Workflow-Based (DAG) Coordination Architecture.
+"""Variant 1: Sequential Coordination Architecture.
 
-Executes a formal Directed Acyclic Graph with conditional branch edges:
-[Orchestrator Node] -> [Parallel Retrieval Node] -> [Verification Node]
-                      ^                                       |
-                      |--- (if insufficient & round < MAX) ---|
-                                                              v
-                                                       [Reviewer Node] -> [End]
+Agents run one after another in a linear pipeline, strictly following the Orchestrator's plan:
+Orchestrator -> Assigned Retrieval Agents in order -> Verification -> (re-plan if insufficient) -> Reviewer.
 """
 from __future__ import annotations
 
-import concurrent.futures
 import time
 from typing import Any, Dict, List, Optional
 
 from agents.blackboard import Blackboard, BlackboardStatus
-from parul_aggarwal.architectures.base import (
+from architectures.base import (
     Architecture,
     StubRetrievalAgent,
     StubVerificationAgent,
 )
 
 
-class WorkflowDAGArchitecture(Architecture):
-    name = "workflow_dag"
+class SequentialArchitecture(Architecture):
+    name = "sequential"
 
     def run(
         self,
@@ -50,9 +45,8 @@ class WorkflowDAGArchitecture(Architecture):
         plan = None
         v_res = {}
 
-        # DAG Node execution loop
         while round_num <= self.max_rounds:
-            # Node 1: Orchestrator Node
+            # 1. Orchestrator
             c_start = time.time()
             if plan is None:
                 plan = self.orchestrator.plan(question, run_id, round_num=round_num, blackboard=blackboard)
@@ -60,44 +54,37 @@ class WorkflowDAGArchitecture(Architecture):
                 feedback = "; ".join(v_res.get("gaps", ["Need more evidence"]))
                 plan = self.orchestrator.replan(plan, feedback=feedback, blackboard=blackboard)
             coord_overhead_ms += (time.time() - c_start) * 1000
-            agents_invoked.append(f"dag_orchestrator_node_r{round_num}")
+            agents_invoked.append(f"orchestrator_r{round_num}")
 
-            # Node 2: Parallel Retrieval DAG Node
-            tasks = []
-            c_prep = time.time()
+            # 2. Sequential execution strictly adhering to the planned subtasks
+            assigned_agent_names = [st.assigned_agent for st in plan.subtasks]
             for subtask in plan.subtasks:
-                ag = agents.get(subtask.assigned_agent)
-                if ag:
-                    tasks.append((subtask.assigned_agent, ag, subtask.sub_query))
-            coord_overhead_ms += (time.time() - c_prep) * 1000
+                agent_name = subtask.assigned_agent
+                agent = agents.get(agent_name)
+                if agent:
+                    agents_invoked.append(agent_name)
+                    c_disp = time.time()
+                    subquery = subtask.sub_query
+                    coord_overhead_ms += (time.time() - c_disp) * 1000
 
-            def _dag_exec(t):
-                ag_name, ag_inst, q = t
-                if hasattr(ag_inst, "run"):
-                    try:
-                        return ag_name, ag_inst.run(q, repo_slug=repo_slug)
-                    except TypeError:
-                        return ag_name, ag_inst.run(blackboard)
-                return ag_name, []
+                    if hasattr(agent, "run"):
+                        try:
+                            frags = agent.run(subquery, repo_slug=repo_slug)
+                        except TypeError:
+                            blackboard.question = subquery
+                            frags = agent.run(blackboard)
+                        if isinstance(frags, list):
+                            c_post = time.time()
+                            blackboard.post_evidence(agent_name, frags)
+                            coord_overhead_ms += (time.time() - c_post) * 1000
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-                batch_res = list(pool.map(_dag_exec, tasks))
-
-            c_gather = time.time()
-            for ag_name, frags in batch_res:
-                agents_invoked.append(ag_name)
-                if isinstance(frags, list):
-                    blackboard.post_evidence(ag_name, frags)
-            coord_overhead_ms += (time.time() - c_gather) * 1000
-
-            # Node 3: Verification Node
+            # 3. Verification Agent
             c_v = time.time()
             blackboard.set_status(BlackboardStatus.VERIFYING)
             coord_overhead_ms += (time.time() - c_v) * 1000
-            agents_invoked.append("dag_verification_node")
+            agents_invoked.append("verification")
             v_res = verifier.run(blackboard)
 
-            # Conditional Edge Routing
             if v_res.get("sufficient", False):
                 break
             else:
@@ -110,8 +97,8 @@ class WorkflowDAGArchitecture(Architecture):
                     incomplete = True
                     break
 
-        # Node 4: Reviewer Node
-        c_rev = time.time()
+        # 4. Reviewer Agent
+        c_start = time.time()
         blackboard.set_status(BlackboardStatus.SYNTHESIZING)
         evidence_dicts = [
             {
@@ -124,7 +111,7 @@ class WorkflowDAGArchitecture(Architecture):
             }
             for e in blackboard.get_evidence()
         ]
-        coord_overhead_ms += (time.time() - c_rev) * 1000
+        coord_overhead_ms += (time.time() - c_start) * 1000
 
         reviewer_res = self.reviewer.review(
             {
@@ -136,7 +123,7 @@ class WorkflowDAGArchitecture(Architecture):
             },
             blackboard=blackboard
         )
-        agents_invoked.append("dag_reviewer_node")
+        agents_invoked.append("reviewer")
 
         return self._format_run_output(
             run_id=run_id,
@@ -144,7 +131,7 @@ class WorkflowDAGArchitecture(Architecture):
             blackboard=blackboard,
             reviewer_res=reviewer_res,
             start_time=start_time,
-            coordination_time_ms=min(coord_overhead_ms, (time.time() - start_time) * 1000),
+            coordination_time_ms=coord_overhead_ms,
             agents_invoked=agents_invoked,
             rounds=round_num
         )

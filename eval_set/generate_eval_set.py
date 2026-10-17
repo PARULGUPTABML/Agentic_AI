@@ -7,17 +7,24 @@ import os
 import subprocess
 from pathlib import Path
 
-GIT_DIR_CANDIDATES = [
-    Path(os.environ.get("SEL4_GIT_DIR", "")),
-    Path(__file__).resolve().parent.parent.parent / "scratch" / "seL4.git",
-    Path("/Users/parulaggarwal/.gemini/antigravity-ide/brain/5bc621ed-db69-46d3-bcb4-e9d04baf70d3/scratch/seL4.git"),
-    Path("seL4.git"),
-    Path("../seL4.git")
-]
-
 def find_git_dir() -> Path | None:
-    for loc in GIT_DIR_CANDIDATES:
-        if loc and loc.exists() and (loc / "HEAD").exists():
+    candidates = [
+        Path(os.environ.get("SEL4_GIT_DIR", "")),
+        Path("seL4.git"),
+        Path("../seL4.git"),
+        Path("seL4"),
+        Path("../seL4"),
+        Path.home() / ".cache" / "seL4.git",
+        Path.home() / ".cache" / "seL4",
+    ]
+    brain_dir = Path.home() / ".gemini" / "antigravity-ide" / "brain"
+    if brain_dir.exists():
+        for scratch_path in brain_dir.glob("*/scratch/seL4.git"):
+            candidates.append(scratch_path)
+            break
+
+    for loc in candidates:
+        if loc and loc.exists() and ((loc / "HEAD").exists() or (loc / ".git").exists()):
             return loc
     return None
 
@@ -44,8 +51,8 @@ questions = [
             "features": ["PAE", "x86"]
         },
         "needs_multiple_sources": True,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Dev rationale question grounded in real seL4 commit 3e57e647e"
     },
     {
@@ -69,8 +76,8 @@ questions = [
             "features": ["SMP", "lock.c"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Dev timeline question grounded in real seL4 commit 904a13ac1"
     },
     {
@@ -94,8 +101,8 @@ questions = [
             "features": ["Spectre", "IBRS", "RSB"]
         },
         "needs_multiple_sources": True,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Dev authorship question grounded in real seL4 commit f0594ac91"
     },
     {
@@ -119,8 +126,8 @@ questions = [
             "features": ["cache flush", "untyped"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Dev superseded implementation question grounded in real commit 03ad568c8"
     },
     {
@@ -144,8 +151,8 @@ questions = [
             "features": ["MCS", "endpoint", "notification"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Dev hard rationale question grounded in real commit 771c9e43c"
     },
     {
@@ -169,8 +176,8 @@ questions = [
             "features": ["Cortex-A15", "errata"]
         },
         "needs_multiple_sources": True,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Dev timeline question grounded in real seL4 PR 5 and commit 43e1a215b"
     },
     {
@@ -193,8 +200,8 @@ questions = [
             "features": ["Kyber"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Dev unanswerable diagnostic question testing hallucination detection"
     },
 
@@ -220,8 +227,8 @@ questions = [
             "features": ["AArch64", "ASID", "TLB"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout rationale question from real commit 28b8f4c40"
     },
     {
@@ -245,8 +252,8 @@ questions = [
             "features": ["pc99", "IOAPIC", "IRQ"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout timeline question from real commit ecec5e4af"
     },
     {
@@ -270,8 +277,8 @@ questions = [
             "features": ["fastpath", "MCS"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout authorship question from real commit fc9bd2a41"
     },
     {
@@ -295,8 +302,8 @@ questions = [
             "features": ["CMake", "pc99", "KernelIOMMU"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout superseded implementation question from real commit b0f974c4a"
     },
     {
@@ -320,8 +327,8 @@ questions = [
             "features": ["AArch32", "ASID"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout rationale question from real commit 8b8969a23"
     },
     {
@@ -345,8 +352,8 @@ questions = [
             "features": ["IOAPIC", "IRQ"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout timeline question from real commit 6e9370a56"
     },
     {
@@ -370,8 +377,8 @@ questions = [
             "features": ["GICv3", "Aff3", "ARM"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout authorship question from real commit 357c6003d"
     },
     {
@@ -395,8 +402,8 @@ questions = [
             "features": ["zombie", "radix"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout superseded implementation question from real commit 18db53023"
     },
     {
@@ -420,8 +427,8 @@ questions = [
             "features": ["AArch64", "KernelPrinting"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout rationale question from real commit 6df0b6ee6"
     },
     {
@@ -446,8 +453,8 @@ questions = [
             "features": ["KernelAArch64SErrorIgnore", "SError"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout rationale question from real commit f963b22f7"
     },
     {
@@ -471,8 +478,8 @@ questions = [
             "features": ["x86", "VCPU"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout authorship question from real commit 57a909f61"
     },
     {
@@ -496,8 +503,8 @@ questions = [
             "features": ["IOAPIC", "pc99"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout superseded implementation question from real commit a7b88f937"
     },
     {
@@ -521,8 +528,8 @@ questions = [
             "features": ["CNode"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout rationale question from real commit ed5e7c8e5"
     },
     {
@@ -546,8 +553,8 @@ questions = [
             "features": ["fastpath", "SysReplyRecv", "SysCall"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout superseded implementation question from real commit 859465e6a"
     },
     {
@@ -571,8 +578,8 @@ questions = [
             "features": ["libsel4", "IOPageTable"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout authorship question from real commit b57b3de19"
     },
     {
@@ -596,8 +603,8 @@ questions = [
             "features": ["L2C-310", "ARM"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout superseded implementation question from real commit 0a72b4cfc"
     },
     {
@@ -621,8 +628,8 @@ questions = [
             "features": ["x86 SMP", "VT-X"]
         },
         "needs_multiple_sources": True,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout hard rationale question from real commit e912dff73"
     },
     {
@@ -646,8 +653,8 @@ questions = [
             "features": ["RISC-V", "PLIC", "QEMU"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout timeline question from real commit c6ce4d2a0"
     },
     {
@@ -671,8 +678,8 @@ questions = [
             "features": ["TCB", "SMP", "BENCHMARK"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout authorship question from real commit 11c5d5052"
     },
     {
@@ -696,8 +703,8 @@ questions = [
             "features": ["scheduler", "debug"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout superseded implementation question from real commit 0e560cf7e"
     },
     {
@@ -721,8 +728,8 @@ questions = [
             "features": ["VM exit", "x86_64", "RSP"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout hard rationale question from real commit 62a062d2a"
     },
     {
@@ -745,8 +752,8 @@ questions = [
             "features": ["scheduler", "AI"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout unanswerable question testing hallucination detection"
     },
     {
@@ -770,8 +777,8 @@ questions = [
             "features": ["TCB_SIZE_BITS", "MCS"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout timeline question from real commit c962e51e3"
     },
     {
@@ -795,8 +802,8 @@ questions = [
             "features": ["RISC-V", "fastpath", "benchmark"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout authorship question from real commit b0567c4d1"
     },
     {
@@ -820,8 +827,8 @@ questions = [
             "features": ["KernelPaddrUserTop"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout superseded implementation question from real commit ddfd66787"
     },
     {
@@ -845,8 +852,8 @@ questions = [
             "features": ["ARM64", "SError"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout rationale question from real commit c4b44a24b"
     },
     {
@@ -870,8 +877,8 @@ questions = [
             "features": ["AArch64", "VDISR_EL2", "CSSELR_EL1"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout timeline question from real commit 9579c3883"
     },
     {
@@ -894,8 +901,8 @@ questions = [
             "features": ["blockchain"]
         },
         "needs_multiple_sources": False,
-        "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Aggarwal (230540)",
+        "annotator": "Evaluation Team",
+        "validated_by": "seL4 Benchmark Suite",
         "notes": "Heldout unanswerable question testing hallucination detection"
     }
 ]

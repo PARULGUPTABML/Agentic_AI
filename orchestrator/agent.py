@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from parul_aggarwal.orchestrator.schema import (
+from orchestrator.schema import (
     ALLOWED_AGENTS,
     ALLOWED_INTENTS,
     Entities,

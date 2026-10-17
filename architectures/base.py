@@ -6,8 +6,8 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 
 from agents.blackboard import Blackboard, BlackboardStatus, EvidenceFragment
-from parul_aggarwal.orchestrator.agent import OrchestratorAgent
-from parul_aggarwal.reviewer.agent import ReviewerAgent
+from orchestrator.agent import OrchestratorAgent
+from reviewer.agent import ReviewerAgent
 
 
 class StubRetrievalAgent:

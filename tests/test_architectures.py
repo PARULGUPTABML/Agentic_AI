@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import pytest
 
-from parul_aggarwal.architectures.sequential import SequentialArchitecture
-from parul_aggarwal.architectures.hierarchical import HierarchicalArchitecture
-from parul_aggarwal.architectures.event_driven import EventDrivenArchitecture
-from parul_aggarwal.architectures.workflow_dag import WorkflowDAGArchitecture
-from parul_aggarwal.architectures.base import StubVerificationAgent
+from architectures.sequential import SequentialArchitecture
+from architectures.hierarchical import HierarchicalArchitecture
+from architectures.event_driven import EventDrivenArchitecture
+from architectures.workflow_dag import WorkflowDAGArchitecture
+from architectures.base import StubVerificationAgent
 
 
 DEV_SAMPLE_QUESTIONS = [

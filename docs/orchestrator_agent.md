@@ -1,8 +1,7 @@
 # Orchestrator / Manager Agent: Methodology and Build Guide
 
-**Owner:** Parul Aggarwal (230540)  
-**Deliverable Window:** Weeks 3-5  
-**Artifacts:** `parul_aggarwal/orchestrator/agent.py`, `schema.py`, `prompts/orchestrator_system.md`, `tests/test_orchestrator.py`
+**Component:** Orchestrator / Manager Agent  
+**Artifacts:** `orchestrator/agent.py`, `schema.py`, `prompts/orchestrator_system.md`, `tests/test_orchestrator.py`
 
 ---
 
@@ -53,7 +52,7 @@ Entities are extracted dynamically from the question text without hardcoded cand
 
 ---
 
-## 5. Definition of Done Checklist
+## 5. Verification Checklist
 
 - [x] Plan schema strictly defined and validated in code (`schema.py`)
 - [x] System prompt maintained in separate versioned file (`prompts/orchestrator_system.md`)

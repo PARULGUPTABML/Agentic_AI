@@ -5,9 +5,9 @@ import os
 from unittest.mock import patch
 import pytest
 
-from parul_aggarwal.reviewer.agent import ReviewerAgent
-from parul_aggarwal.reviewer.citation_checker import check_citations, extract_citations
-from parul_aggarwal.reviewer.renderer import render_template
+from reviewer.agent import ReviewerAgent
+from reviewer.citation_checker import check_citations, extract_citations
+from reviewer.renderer import render_template
 from agents.blackboard import Blackboard, EvidenceFragment, BlackboardStatus
 
 

@@ -1,23 +1,25 @@
-"""Variant 1: Sequential Coordination Architecture.
+"""Variant 2: Hierarchical Coordination Architecture.
 
-Agents run one after another in a linear pipeline, strictly following the Orchestrator's plan:
-Orchestrator -> Assigned Retrieval Agents in order -> Verification -> (re-plan if insufficient) -> Reviewer.
+The Orchestrator acts as the central controller:
+It delegates subtasks to retrieval agents in parallel, collects results,
+submits to verification, decides re-planning rounds, and delegates final synthesis to Reviewer.
 """
 from __future__ import annotations
 
+import concurrent.futures
 import time
 from typing import Any, Dict, List, Optional
 
 from agents.blackboard import Blackboard, BlackboardStatus
-from parul_aggarwal.architectures.base import (
+from architectures.base import (
     Architecture,
     StubRetrievalAgent,
     StubVerificationAgent,
 )
 
 
-class SequentialArchitecture(Architecture):
-    name = "sequential"
+class HierarchicalArchitecture(Architecture):
+    name = "hierarchical"
 
     def run(
         self,
@@ -46,7 +48,7 @@ class SequentialArchitecture(Architecture):
         v_res = {}
 
         while round_num <= self.max_rounds:
-            # 1. Orchestrator
+            # 1. Orchestrator Controller creates/updates plan
             c_start = time.time()
             if plan is None:
                 plan = self.orchestrator.plan(question, run_id, round_num=round_num, blackboard=blackboard)
@@ -54,31 +56,38 @@ class SequentialArchitecture(Architecture):
                 feedback = "; ".join(v_res.get("gaps", ["Need more evidence"]))
                 plan = self.orchestrator.replan(plan, feedback=feedback, blackboard=blackboard)
             coord_overhead_ms += (time.time() - c_start) * 1000
-            agents_invoked.append(f"orchestrator_r{round_num}")
+            agents_invoked.append(f"orchestrator_controller_r{round_num}")
 
-            # 2. Sequential execution strictly adhering to the planned subtasks
-            assigned_agent_names = [st.assigned_agent for st in plan.subtasks]
+            # 2. Parallel dispatch of planned subtasks
+            tasks_to_run = []
+            c_prep = time.time()
             for subtask in plan.subtasks:
-                agent_name = subtask.assigned_agent
-                agent = agents.get(agent_name)
+                agent = agents.get(subtask.assigned_agent)
                 if agent:
-                    agents_invoked.append(agent_name)
-                    c_disp = time.time()
-                    subquery = subtask.sub_query
-                    coord_overhead_ms += (time.time() - c_disp) * 1000
+                    tasks_to_run.append((subtask.assigned_agent, agent, subtask.sub_query))
+            coord_overhead_ms += (time.time() - c_prep) * 1000
 
-                    if hasattr(agent, "run"):
-                        try:
-                            frags = agent.run(subquery, repo_slug=repo_slug)
-                        except TypeError:
-                            blackboard.question = subquery
-                            frags = agent.run(blackboard)
-                        if isinstance(frags, list):
-                            c_post = time.time()
-                            blackboard.post_evidence(agent_name, frags)
-                            coord_overhead_ms += (time.time() - c_post) * 1000
+            def _invoke_worker(agent_tuple):
+                ag_name, ag_instance, q = agent_tuple
+                if hasattr(ag_instance, "run"):
+                    try:
+                        return ag_name, ag_instance.run(q, repo_slug=repo_slug)
+                    except TypeError:
+                        return ag_name, ag_instance.run(blackboard)
+                return ag_name, []
 
-            # 3. Verification Agent
+            # Execute workers in parallel (worker time is agent work, not coordination overhead)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                results = list(executor.map(_invoke_worker, tasks_to_run))
+
+            c_gather = time.time()
+            for ag_name, frags in results:
+                agents_invoked.append(ag_name)
+                if isinstance(frags, list):
+                    blackboard.post_evidence(ag_name, frags)
+            coord_overhead_ms += (time.time() - c_gather) * 1000
+
+            # 3. Manager queries Verification
             c_v = time.time()
             blackboard.set_status(BlackboardStatus.VERIFYING)
             coord_overhead_ms += (time.time() - c_v) * 1000
@@ -97,7 +106,7 @@ class SequentialArchitecture(Architecture):
                     incomplete = True
                     break
 
-        # 4. Reviewer Agent
+        # 4. Manager delegates final synthesis to Reviewer
         c_start = time.time()
         blackboard.set_status(BlackboardStatus.SYNTHESIZING)
         evidence_dicts = [

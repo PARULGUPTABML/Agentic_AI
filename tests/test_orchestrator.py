@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 import pytest
 
-from parul_aggarwal.orchestrator.agent import OrchestratorAgent, MAX_ROUNDS
-from parul_aggarwal.orchestrator.schema import (
+from orchestrator.agent import OrchestratorAgent, MAX_ROUNDS
+from orchestrator.schema import (
     OrchestrationPlan,
     Entities,
     PlanSubtask,
@@ -134,7 +134,7 @@ class TestOrchestratorAgent:
 
     def test_dev_set_intent_accuracy(self, agent):
         """Run through the dev questions from questions.jsonl and verify intent accuracy >= 85%."""
-        questions_path = Path("parul_aggarwal/eval_set/questions.jsonl")
+        questions_path = Path("eval_set/questions.jsonl")
         if not questions_path.exists():
             pytest.skip("questions.jsonl not found")
 

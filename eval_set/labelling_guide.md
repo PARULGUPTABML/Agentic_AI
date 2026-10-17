@@ -1,6 +1,6 @@
 # Evaluation Question Set Labelling Guide
 
-**Owner:** Parul Aggarwal (230540)  
+**Component:** Evaluation Dataset Annotation Standards  
 **Project:** Repository-Aware Multi-Agent AI for Software History and Development Decisions
 
 ---
@@ -54,7 +54,7 @@ Each line in `questions.jsonl` is a valid, single JSON object conforming to:
     "features": ["untyped memory", "spatial isolation"]
   },
   "needs_multiple_sources": true,
-  "annotator": "Parul Aggarwal",
+  "annotator": "Evaluation Team",
   "validated_by": "Team Lead / Peer Reviewer",
   "notes": "Covers transition to seL4 untyped memory architecture"
 }
