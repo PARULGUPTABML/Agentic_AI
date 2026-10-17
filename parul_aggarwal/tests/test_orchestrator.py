@@ -72,7 +72,7 @@ class TestOrchestratorAgent:
         return OrchestratorAgent()
 
     def test_intent_classification_rationale(self, agent):
-        q = "Why was the kernel memory allocation mechanism changed to untyped memory?"
+        q = "Why was PAE (Physical Address Extension) support removed from x86 in seL4?"
         plan = agent.plan(q, run_id="test-1")
         assert plan.intent == "rationale"
         assigned = [s.assigned_agent for s in plan.subtasks]
@@ -80,36 +80,45 @@ class TestOrchestratorAgent:
         assert "code_analysis" in assigned
 
     def test_intent_classification_timeline(self, agent):
-        q = "When was the dual-priority round-robin scheduler introduced in the kernel?"
+        q = "When was SMP lock.c moved from the x86 architecture directory to the generic smp directory?"
         plan = agent.plan(q, run_id="test-2")
         assert plan.intent == "timeline"
         assigned = [s.assigned_agent for s in plan.subtasks]
         assert "history_rag" in assigned
 
     def test_intent_classification_authorship(self, agent):
-        q = "Who authored the fault-handling capability redesign and who approved the PR?"
+        q = "Who authored the hardware IBRS and jump table Spectre mitigations in seL4 x86?"
         plan = agent.plan(q, run_id="test-3")
         assert plan.intent == "authorship"
         assigned = [s.assigned_agent for s in plan.subtasks]
         assert "history_rag" in assigned
         assert "issue_pr" in assigned
 
+    def test_intent_word_boundaries_not_fooled_by_whole_or_whose(self, agent):
+        """Regression test: 'whole' and 'whose' must not be classified as authorship."""
+        q1 = "Describe the whole architecture of the kernel."
+        assert agent.classify_intent_heuristic(q1) != "authorship"
+        q2 = "Explain the rationale whose justification is missing."
+        assert agent.classify_intent_heuristic(q2) == "rationale"
+
     def test_intent_classification_superseded(self, agent):
-        q = "What implementation did the fastpath IPC assembly routine supersede?"
+        q = "What implementation did moving the cache flush from untyped reset to retype supersede?"
         plan = agent.plan(q, run_id="test-4")
         assert plan.intent == "superseded_implementation"
 
-    def test_replan_round_limit(self, agent):
-        plan1 = agent.plan("Why was auth redesigned?", run_id="replan-1", round_num=1)
+    def test_replan_round_limit_and_no_nested_queries(self, agent):
+        orig_q = "Why was PAE removed?"
+        plan1 = agent.plan(orig_q, run_id="replan-1", round_num=1)
         assert plan1.round == 1
         plan2 = agent.replan(plan1, feedback="Missing commit diffs")
         assert plan2.round == 2
-        # Round limit enforcement
+        # Verify query is not nested repeatedly
+        assert not any("Analyze code structure: Analyze" in st.sub_query for st in plan2.subtasks)
         plan3 = agent.replan(plan2, feedback="Still missing commit diffs")
-        assert plan3.round == MAX_ROUNDS  # Should not exceed MAX_ROUNDS
+        assert plan3.round == MAX_ROUNDS
 
     def test_determinism(self, agent):
-        q = "Why was the global kernel big lock replaced with fine-grained locking?"
+        q = "Why was PAE support removed from x86 in seL4?"
         p1 = agent.plan(q, run_id="det-1")
         p2 = agent.plan(q, run_id="det-1")
         p3 = agent.plan(q, run_id="det-1")
@@ -117,14 +126,14 @@ class TestOrchestratorAgent:
         assert [s.assigned_agent for s in p1.subtasks] == [s.assigned_agent for s in p2.subtasks] == [s.assigned_agent for s in p3.subtasks]
 
     def test_blackboard_logging(self, agent):
-        bb = Blackboard(question="Why was auth changed?", repo_slug="seL4__seL4")
+        bb = Blackboard(question="Why was PAE removed?", repo_slug="seL4__seL4")
         plan = agent.plan(bb.question, run_id=bb.run_id, blackboard=bb)
         logs = bb.get_logs()
         assert len(logs) > 0
         assert any(l.agent == "orchestrator" for l in logs)
 
     def test_dev_set_intent_accuracy(self, agent):
-        """Run through the dev questions from questions.jsonl and verify intent classification accuracy >= 85%."""
+        """Run through the dev questions from questions.jsonl and verify intent accuracy >= 85%."""
         questions_path = Path("parul_aggarwal/eval_set/questions.jsonl")
         if not questions_path.exists():
             pytest.skip("questions.jsonl not found")

@@ -24,13 +24,35 @@ ENTAILMENT_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "r
 class ReviewerAgent:
     def __init__(self, prompt_path: Optional[Path] = None, enable_entailment_check: bool = False):
         self.prompt_path = prompt_path or PROMPT_PATH
+        self.entailment_prompt_path = ENTAILMENT_PROMPT_PATH
         self.system_prompt = self._load_prompt(self.prompt_path)
+        self.entailment_prompt = self._load_prompt(self.entailment_prompt_path)
         self.enable_entailment_check = enable_entailment_check
 
     def _load_prompt(self, path: Path) -> str:
         if path.exists():
             return path.read_text(encoding="utf-8")
         return "Reviewer Agent: Synthesize evidence into a cited, factual response with explicit inference separation."
+
+    def check_entailment(self, claim: str, evidence_text: str) -> bool:
+        """Verify whether the claim is entailed by the cited evidence text."""
+        use_llm = os.environ.get("LLM_PROVIDER", "").lower() not in ("mock", "none", "")
+        if use_llm:
+            try:
+                from agents._llm_retry import generate_with_retry
+                p = self.entailment_prompt.replace("{claim}", claim).replace("{evidence_text}", evidence_text)
+                res = generate_with_retry("You are an entailment verification judge. Output YES or NO only.", p)
+                return "yes" in res.lower()
+            except Exception as e:
+                logger.warning("LLM entailment check failed (%s). Falling back to lexical verification.", e)
+
+        # Lexical verification fallback
+        claim_words = set(re.findall(r"\b[a-zA-Z]{4,}\b", claim.lower()))
+        ev_words = set(re.findall(r"\b[a-zA-Z]{4,}\b", evidence_text.lower()))
+        if not claim_words:
+            return True
+        overlap = len(claim_words.intersection(ev_words)) / len(claim_words)
+        return overlap >= 0.4
 
     def review(
         self,
@@ -52,13 +74,11 @@ class ReviewerAgent:
 
         # 1. Intake: Filter out malformed evidence items missing an ID
         valid_evidence: List[Dict[str, Any]] = []
-        invalid_evidence_dropped = 0
         valid_evidence_ids: Set[str] = set()
 
         for item in raw_evidence:
             eid = item.get("id")
             if not eid:
-                invalid_evidence_dropped += 1
                 logger.warning("Dropped evidence item without ID: %s", item)
                 continue
             valid_evidence.append(item)
@@ -76,7 +96,7 @@ class ReviewerAgent:
             rendered = render_template(
                 answer=ans_text,
                 claims=[],
-                inference="No inferences can be drawn without supporting evidence.",
+                inference="None",
                 confidence="low",
                 gaps=gaps
             )
@@ -84,7 +104,7 @@ class ReviewerAgent:
                 "run_id": run_id,
                 "answer": ans_text,
                 "claims": [],
-                "inference": "No inferences can be drawn without supporting evidence.",
+                "inference": "None",
                 "gaps": gaps,
                 "confidence": "low",
                 "citation_check": {"valid": 0, "invalid": 0, "removed": []},
@@ -94,73 +114,100 @@ class ReviewerAgent:
             self._update_blackboard(blackboard, result, time.time() - start_time)
             return result
 
-        # 3. Grounded Drafting & Claim Construction
+        # 3. Grounded Drafting
+        use_llm = os.environ.get("LLM_PROVIDER", "").lower() not in ("mock", "none", "")
+        answer_text = ""
         claims: List[Dict[str, Any]] = []
-        answer_parts: List[str] = []
+        inference_text = "None"
 
-        # Sort evidence by confidence
-        sorted_ev = sorted(valid_evidence, key=lambda x: x.get("confidence", 0.0), reverse=True)
+        if use_llm:
+            try:
+                from agents._llm_retry import generate_with_retry
+                ev_summary = "\n".join([
+                    f"[{e['id']}] ({e.get('title', '')}): {e.get('text', '') or e.get('content', '')}"
+                    for e in valid_evidence
+                ])
+                prompt = (
+                    f"Question: {question}\nIncomplete: {incomplete}\n\nEvidence:\n{ev_summary}\n\n"
+                    "Provide a synthesized answer citing evidence IDs inline."
+                )
+                raw_llm = generate_with_retry(self.system_prompt, prompt)
+                answer_text = raw_llm.strip()
+            except Exception as e:
+                logger.warning("Reviewer LLM call failed (%s). Using rule-based synthesizer.", e)
 
-        for ev in sorted_ev[:4]:  # Top relevant fragments
-            eid = ev["id"]
-            title = ev.get("title", "")
-            snippet = ev.get("text") or ev.get("content") or ev.get("snippet") or ""
-            # Clean snippet to one key statement
-            first_sentence = snippet.strip().split("\n")[0].strip()
-            if len(first_sentence) > 160:
-                first_sentence = first_sentence[:157] + "..."
+        if not answer_text:
+            # Rule-based synthesis strictly from evidence
+            sorted_ev = sorted(valid_evidence, key=lambda x: x.get("confidence", 0.0), reverse=True)
+            fact_statements = []
+            for ev in sorted_ev[:3]:
+                eid = ev["id"]
+                title = ev.get("title", "")
+                snippet = ev.get("text") or ev.get("content") or ev.get("snippet") or ""
+                first_line = snippet.strip().split("\n")[0].strip()
+                if len(first_line) > 140:
+                    first_line = first_line[:137] + "..."
+                stmt = f"{title}: {first_line}" if title and title not in first_line else first_line
+                claims.append({
+                    "text": stmt,
+                    "type": "evidence",
+                    "citations": [eid]
+                })
+                fact_statements.append(f"{stmt} [{eid}]")
 
-            claim_text = f"{title}: {first_sentence}" if title and title not in first_sentence else first_sentence
-            claims.append({
-                "text": claim_text,
-                "type": "evidence",
-                "citations": [eid]
-            })
-            answer_parts.append(f"{claim_text} [{eid}]")
+            answer_text = " ".join(fact_statements)
+            # Only generate an inference if evidence demonstrates a clear causal/architectural link
+            # Never invent a blanket inference like "deliberate architectural consolidation"
+            inference_text = "None"
 
-        # Deduce inference from evidence if applicable
-        inference = ""
-        if len(valid_evidence) >= 2:
-            inference = "The structural updates across these commits suggest a deliberate architectural consolidation."
-            claims.append({
-                "text": inference,
-                "type": "inference",
-                "citations": []
-            })
+        # 4. Optional Entailment Spot Check
+        if self.enable_entailment_check and claims:
+            ev_map = {e["id"]: e.get("text") or e.get("content") or "" for e in valid_evidence}
+            sanitized_entailment_claims = []
+            for c in claims:
+                if c.get("type") == "evidence":
+                    c_text = c.get("text", "")
+                    c_ids = c.get("citations", [])
+                    entailed = True
+                    for cid in c_ids:
+                        ev_content = ev_map.get(cid, "")
+                        if not self.check_entailment(c_text, ev_content):
+                            entailed = False
+                            break
+                    if not entailed:
+                        c["type"] = "inference"
+                        c["warning"] = "Entailment check failed; classified as inference"
+                sanitized_entailment_claims.append(c)
+            claims = sanitized_entailment_claims
 
-        # 4. Programmatic Citation Checker
+        # 5. Programmatic Citation Checker
         sanitized_claims, citation_stats = check_citations(claims, valid_evidence_ids)
 
-        # 5. Evaluate Gaps & Confidence
+        # 6. Gaps & Confidence
         gaps = list(gap_notes)
         if incomplete:
             gaps.append("Retrieval terminated early at re-planning limit; some secondary details may be missing")
 
-        if incomplete or citation_stats["invalid"] > 0:
-            confidence = "medium" if len(valid_evidence) >= 2 else "low"
-        elif len(valid_evidence) >= 2 and all(ev.get("confidence", 0.0) >= 0.7 for ev in valid_evidence[:2]):
+        if incomplete or citation_stats["invalid"] > 0 or len(valid_evidence) == 1:
+            confidence = "medium" if len(valid_evidence) >= 1 else "low"
+        elif len(valid_evidence) >= 2 and all(e.get("confidence", 0.0) >= 0.75 for e in valid_evidence[:2]):
             confidence = "high"
         else:
             confidence = "medium"
 
-        # Combine answer text
-        joined_answer = " ".join(answer_parts)
-        if incomplete:
-            joined_answer += " Note: evidence retrieval was incomplete."
-
         rendered = render_template(
-            answer=joined_answer,
+            answer=answer_text,
             claims=sanitized_claims,
-            inference=inference,
+            inference=inference_text,
             confidence=confidence,
             gaps=gaps
         )
 
         output = {
             "run_id": run_id,
-            "answer": joined_answer,
+            "answer": answer_text,
             "claims": sanitized_claims,
-            "inference": inference or "None",
+            "inference": inference_text,
             "gaps": gaps,
             "confidence": confidence,
             "citation_check": citation_stats,

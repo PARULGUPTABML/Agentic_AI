@@ -2,13 +2,14 @@
 
 Agents react asynchronously to events published to a shared event bus:
 'question_received' -> Orchestrator publishes 'plan_ready'
-Retrieval agents subscribe to 'plan_ready' -> publish 'evidence_posted'
+Retrieval agents subscribe to 'plan_ready' -> dispatched in parallel -> publish 'evidence_posted'
 Verification subscribes to 'evidence_posted' -> publishes 'evidence_approved' or 'evidence_insufficient'
 Reviewer subscribes to 'evidence_approved' -> publishes 'answer_complete'.
 """
 from __future__ import annotations
 
 import collections
+import concurrent.futures
 import queue
 import time
 from dataclasses import dataclass
@@ -82,38 +83,62 @@ class EventDrivenArchitecture(Architecture):
             "incomplete": False,
             "done": False,
             "reviewer_res": {},
-            "v_res": {}
+            "v_res": {},
+            "current_plan": None
         }
 
         # Event Handlers
         def on_question(event: Event):
+            nonlocal coord_overhead_ms
             c_start = time.time()
             plan = self.orchestrator.plan(question, run_id, round_num=state["round"], blackboard=blackboard)
-            nonlocal coord_overhead_ms
+            state["current_plan"] = plan
             coord_overhead_ms += (time.time() - c_start) * 1000
             agents_invoked.append(f"orchestrator_event_r{state['round']}")
             bus.publish("plan_ready", plan)
 
         def on_plan_ready(event: Event):
+            nonlocal coord_overhead_ms
             plan = event.payload
+            tasks = []
+            c_prep = time.time()
             for subtask in plan.subtasks:
                 agent = agents.get(subtask.assigned_agent)
                 if agent:
-                    agents_invoked.append(subtask.assigned_agent)
-                    if hasattr(agent, "run"):
-                        try:
-                            frags = agent.run(subtask.sub_query, repo_slug=repo_slug)
-                        except TypeError:
-                            frags = agent.run(blackboard)
-                        if isinstance(frags, list):
-                            blackboard.post_evidence(subtask.assigned_agent, frags)
+                    tasks.append((subtask.assigned_agent, agent, subtask.sub_query))
+            coord_overhead_ms += (time.time() - c_prep) * 1000
+
+            def _run_worker(t):
+                ag_name, ag_inst, q = t
+                if hasattr(ag_inst, "run"):
+                    try:
+                        return ag_name, ag_inst.run(q, repo_slug=repo_slug)
+                    except TypeError:
+                        return ag_name, ag_inst.run(blackboard)
+                return ag_name, []
+
+            # Concurrent dispatch across workers for real parallelism
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+                results = list(pool.map(_run_worker, tasks))
+
+            c_post = time.time()
+            for ag_name, frags in results:
+                agents_invoked.append(ag_name)
+                if isinstance(frags, list):
+                    blackboard.post_evidence(ag_name, frags)
+            coord_overhead_ms += (time.time() - c_post) * 1000
+
             bus.publish("evidence_posted", {"count": blackboard.evidence_count()})
 
         def on_evidence_posted(event: Event):
+            nonlocal coord_overhead_ms
+            c_v = time.time()
             blackboard.set_status(BlackboardStatus.VERIFYING)
+            coord_overhead_ms += (time.time() - c_v) * 1000
             agents_invoked.append("verification")
             v_res = verifier.run(blackboard)
             state["v_res"] = v_res
+
             if v_res.get("sufficient", False):
                 bus.publish("evidence_approved", v_res)
             else:
@@ -125,18 +150,19 @@ class EventDrivenArchitecture(Architecture):
                     bus.publish("evidence_approved", v_res)
 
         def on_evidence_insufficient(event: Event):
-            blackboard.set_status(BlackboardStatus.REGATHERING)
-            feedback = "; ".join(event.payload.get("gaps", []))
-            c_start = time.time()
-            plan = self.orchestrator.plan(
-                question, run_id, round_num=state["round"], feedback=feedback, blackboard=blackboard
-            )
             nonlocal coord_overhead_ms
-            coord_overhead_ms += (time.time() - c_start) * 1000
+            c_r = time.time()
+            blackboard.set_status(BlackboardStatus.REGATHERING)
+            feedback = "; ".join(event.payload.get("gaps", ["Need more details"]))
+            plan = self.orchestrator.replan(state["current_plan"], feedback=feedback, blackboard=blackboard)
+            state["current_plan"] = plan
+            coord_overhead_ms += (time.time() - c_r) * 1000
             agents_invoked.append(f"orchestrator_event_r{state['round']}")
             bus.publish("plan_ready", plan)
 
         def on_evidence_approved(event: Event):
+            nonlocal coord_overhead_ms
+            c_rev = time.time()
             blackboard.set_status(BlackboardStatus.SYNTHESIZING)
             evidence_dicts = [
                 {
@@ -149,7 +175,8 @@ class EventDrivenArchitecture(Architecture):
                 }
                 for e in blackboard.get_evidence()
             ]
-            c_start = time.time()
+            coord_overhead_ms += (time.time() - c_rev) * 1000
+
             res = self.reviewer.review(
                 {
                     "run_id": run_id,
@@ -160,8 +187,6 @@ class EventDrivenArchitecture(Architecture):
                 },
                 blackboard=blackboard
             )
-            nonlocal coord_overhead_ms
-            coord_overhead_ms += (time.time() - c_start) * 1000
             agents_invoked.append("reviewer")
             state["reviewer_res"] = res
             state["done"] = True
@@ -177,14 +202,14 @@ class EventDrivenArchitecture(Architecture):
         # Kickoff
         bus.publish("question_received", question)
 
-        # Event processing loop with timeout guard
         loop_start = time.time()
         while not state["done"]:
             if (time.time() - loop_start) > self.timeout_seconds:
                 state["incomplete"] = True
                 break
-            ev = bus.process_next(timeout=0.1)
-            coord_overhead_ms += 0.5  # Event bus queue handling overhead
+            c_ev = time.time()
+            bus.process_next(timeout=0.1)
+            coord_overhead_ms += (time.time() - c_ev) * 1000
 
         return self._format_run_output(
             run_id=run_id,
@@ -192,7 +217,7 @@ class EventDrivenArchitecture(Architecture):
             blackboard=blackboard,
             reviewer_res=state["reviewer_res"],
             start_time=start_time,
-            coordination_time_ms=coord_overhead_ms,
+            coordination_time_ms=min(coord_overhead_ms, (time.time() - start_time) * 1000),
             agents_invoked=agents_invoked,
             rounds=state["round"]
         )

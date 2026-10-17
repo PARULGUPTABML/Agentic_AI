@@ -37,6 +37,7 @@ class OrchestrationPlan:
     intent: str
     entities: Entities
     subtasks: List[PlanSubtask]
+    original_question: str = ""
     parallel: bool = True
     needs_clarification: bool = False
 
@@ -47,6 +48,7 @@ class OrchestrationPlan:
             "intent": self.intent,
             "entities": self.entities.to_dict(),
             "subtasks": [s.to_dict() for s in self.subtasks],
+            "original_question": self.original_question,
             "parallel": self.parallel,
             "needs_clarification": self.needs_clarification,
         }
@@ -98,6 +100,7 @@ def create_fallback_plan(run_id: str, question: str, round_num: int = 1) -> Orch
             PlanSubtask(id="fb2", assigned_agent="history_rag", sub_query=f"Git commit history for: {question}", reason="Fallback history retrieval"),
             PlanSubtask(id="fb3", assigned_agent="issue_pr", sub_query=f"Issues and PRs for: {question}", reason="Fallback issue/PR search")
         ],
+        original_question=question,
         parallel=True,
         needs_clarification=False
     )

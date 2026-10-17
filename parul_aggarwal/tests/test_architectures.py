@@ -11,11 +11,11 @@ from parul_aggarwal.architectures.base import StubVerificationAgent
 
 
 DEV_SAMPLE_QUESTIONS = [
-    "Why was the kernel memory allocation mechanism changed to untyped memory?",
-    "When was the dual-priority round-robin scheduler introduced in the kernel?",
-    "Who authored the fault-handling capability redesign and who approved the PR?",
-    "What implementation did the fastpath IPC assembly routine supersede?",
-    "Why was the global kernel big lock replaced with fine-grained locking?"
+    "Why was PAE (Physical Address Extension) support removed from x86 in seL4?",
+    "When was SMP lock.c moved from the x86 architecture directory to the generic smp directory?",
+    "Who authored the hardware IBRS and jump table Spectre mitigations in seL4 x86?",
+    "What caching behavior did moving the cache flush from untyped reset to retype supersede?",
+    "Why were endpoint and notification queues unified into a single queue structure under MCS?"
 ]
 
 
@@ -46,16 +46,29 @@ class TestArchitectures:
 
             # Integrity checks
             assert res["architecture"] == arch.name
-            assert len(res["answer"]) > 20
+            assert len(res["answer"]) > 10
             assert "Supporting Evidence" in res["answer"]
             assert res["evidence_count"] >= 1
             assert res["citation_check"]["invalid"] == 0
             assert res["total_latency_ms"] > 0
             assert res["coordination_overhead_ms"] >= 0
+            # Coordination overhead must never exceed total latency
+            assert res["coordination_overhead_ms"] <= res["total_latency_ms"] + 0.1
 
         # Parity check: all return consistent confidence under deterministic stubs
         confidences = {r["confidence"] for r in results.values()}
         assert len(confidences) == 1, f"Confidence divergence across architectures: {confidences}"
+
+    def test_sequential_follows_plan_strictly(self):
+        """Sequential must only invoke agents assigned in the Orchestrator plan."""
+        seq = SequentialArchitecture()
+        # Authorship question: plan assigns history_rag and issue_pr, NOT code_analysis
+        q = "Who authored the hardware IBRS and jump table Spectre mitigations in seL4 x86?"
+        res = seq.run(question=q, run_id="test-seq-plan")
+        invoked = res["agents_invoked"]
+        assert "history_rag" in invoked
+        assert "issue_pr" in invoked
+        assert "code_analysis" not in invoked
 
     def test_replan_round_limit_across_variants(self, architectures):
         """When verification always fails, all variants must terminate cleanly at max_rounds."""

@@ -1,6 +1,6 @@
 """Orchestrator / Manager Agent implementation.
 
-Analyzes question intent, extracts entities, builds execution plan,
+Analyzes question intent, extracts entities dynamically, builds execution plan,
 delegates sub-tasks to agents, and handles re-planning upon insufficiency feedback.
 """
 from __future__ import annotations
@@ -30,6 +30,13 @@ MAX_LLM_CALLS = 4
 
 PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "orchestrator_system.md"
 
+INTENT_PATTERNS = [
+    ("rationale", re.compile(r"\b(why|reason|motivation|purpose|rationale)\b", re.IGNORECASE)),
+    ("timeline", re.compile(r"\b(when|timeline|date|year|sequence|introduced|merged|migrated)\b", re.IGNORECASE)),
+    ("authorship", re.compile(r"\b(who|author|authored|spearheaded|created\s+by|approved\s+by|reviewed\s+by)\b", re.IGNORECASE)),
+    ("superseded_implementation", re.compile(r"\b(supersede|superseded|replace|replaced|deprecated|predecessor|prior\s+to|what\s+did\b.+\bsupersede)\b", re.IGNORECASE)),
+]
+
 
 class OrchestratorAgent:
     def __init__(self, prompt_path: Optional[Path] = None):
@@ -44,66 +51,70 @@ class OrchestratorAgent:
         return "You are an Orchestrator Agent. Decompose questions into subtasks for code_analysis, history_rag, issue_pr."
 
     def classify_intent_heuristic(self, question: str) -> str:
-        q = question.lower()
-        if any(w in q for w in ["why", "reason", "motivation", "purpose", "rationale"]):
-            return "rationale"
-        if any(w in q for w in ["when", "timeline", "date", "year", "sequence", "introduced", "merged", "migrated"]):
-            return "timeline"
-        if any(w in q for w in ["who", "author", "authored", "spearheaded", "created by", "approved by", "reviewed by"]):
-            return "authorship"
-        if any(w in q for w in ["supersede", "replace", "deprecated", "what did", "prior to", "predecessor"]):
-            return "superseded_implementation"
+        """Classify intent using strict word-boundary matching."""
+        # Superseded takes precedence if both "what did ... supersede" occurs
+        for intent_name, pattern in INTENT_PATTERNS:
+            if pattern.search(question):
+                return intent_name
         return "other"
 
     def extract_entities_heuristic(self, question: str) -> Entities:
-        # File paths
-        file_matches = re.findall(r"[\w\./\-]+\.(?:c|h|S|py|json|md|txt|yml|yaml|thy)", question)
-        # Function-like identifiers
-        func_matches = re.findall(r"\b(?:seL4_\w+|[a-z]+[A-Z]\w+|sys_\w+|c_handle_\w+)\b", question)
-        # Features / keywords
-        feature_candidates = ["untyped memory", "fastpath IPC", "MCS", "scheduler", "BKL", "IOAPIC", "IOMMU", "ASID", "CNode", "RISC-V", "AArch64", "PMP"]
-        features = [f for f in feature_candidates if f.lower() in question.lower()]
+        """Extract files, symbols, and architectural features dynamically."""
+        # File paths (e.g. src/kernel/untyped.c or config.cmake)
+        file_matches = re.findall(r"\b[\w\.\-/]+\.(?:c|h|S|py|json|md|txt|yml|yaml|cmake|bf|thy)\b", question)
+        # Function-like and type identifiers (seL4_*, c_handle_*, CamelCase or snake_case symbols)
+        func_matches = re.findall(r"\b(?:seL4_\w+|c_handle_\w+|sys_\w+|[a-z]+[A-Z]\w+|[A-Z][a-zA-Z0-9_]{3,})\b", question)
+        # General architectural acronyms / uppercase tokens (e.g., SMP, PAE, IOMMU, IOAPIC, ASID, GIC, MCS, TCB)
+        feature_matches = re.findall(r"\b(?:[A-Z]{2,}[0-9]*)\b", question)
 
         return Entities(
             files=list(set(file_matches)),
             functions=list(set(func_matches)),
-            features=features,
+            features=list(set(feature_matches)),
             time_range=None,
         )
 
-    def plan_rule_based(self, question: str, run_id: str, round_num: int = 1, feedback: Optional[str] = None) -> OrchestrationPlan:
-        intent = self.classify_intent_heuristic(question)
-        entities = self.extract_entities_heuristic(question)
+    def plan_rule_based(
+        self,
+        question: str,
+        run_id: str,
+        round_num: int = 1,
+        feedback: Optional[str] = None,
+        original_question: Optional[str] = None
+    ) -> OrchestrationPlan:
+        orig_q = original_question or question
+        intent = self.classify_intent_heuristic(orig_q)
+        entities = self.extract_entities_heuristic(orig_q)
 
         subtasks: List[PlanSubtask] = []
         if intent == "rationale":
             subtasks = [
-                PlanSubtask("t1", "code_analysis", f"Analyze code structure and implementation trade-offs for: {question}", "Examine implementation specifics"),
-                PlanSubtask("t2", "history_rag", f"Search commit logs, diffs, and rationale for: {question}", "Find commit messages explaining the change"),
-                PlanSubtask("t3", "issue_pr", f"Find PR debates, issue discussions, and architectural reviews for: {question}", "Retrieve design discussion from PRs and issues")
+                PlanSubtask("t1", "code_analysis", f"Analyze code structure and implementation trade-offs for: {orig_q}", "Examine implementation specifics"),
+                PlanSubtask("t2", "history_rag", f"Search commit logs, diffs, and rationale for: {orig_q}", "Find commit messages explaining the change"),
+                PlanSubtask("t3", "issue_pr", f"Find PR debates, issue discussions, and architectural reviews for: {orig_q}", "Retrieve design discussion from PRs and issues")
             ]
         elif intent == "timeline":
             subtasks = [
-                PlanSubtask("t1", "history_rag", f"Find commits and merge dates for: {question}", "Determine exact commit and merge timestamps"),
-                PlanSubtask("t2", "code_analysis", f"Check version tags, changelog, and header definitions for: {question}", "Confirm API introduction version")
+                PlanSubtask("t1", "history_rag", f"Find commits and merge dates for: {orig_q}", "Determine exact commit and merge timestamps"),
+                PlanSubtask("t2", "code_analysis", f"Check version tags, changelog, and header definitions for: {orig_q}", "Confirm API introduction version")
             ]
         elif intent == "authorship":
             subtasks = [
-                PlanSubtask("t1", "history_rag", f"Find commit authors, committers, and co-authors for: {question}", "Extract author metadata from git commits"),
-                PlanSubtask("t2", "issue_pr", f"Find pull request author, reviewers, and approvers for: {question}", "Identify PR reviewers and approving team members")
+                PlanSubtask("t1", "history_rag", f"Find commit authors, committers, and co-authors for: {orig_q}", "Extract author metadata from git commits"),
+                PlanSubtask("t2", "issue_pr", f"Find pull request author, reviewers, and approvers for: {orig_q}", "Identify PR reviewers and approving team members")
             ]
         elif intent == "superseded_implementation":
             subtasks = [
-                PlanSubtask("t1", "history_rag", f"Find older commits and removed code superseded by: {question}", "Trace git history before and during replacement"),
-                PlanSubtask("t2", "code_analysis", f"Inspect legacy headers, deprecated functions, and replacements for: {question}", "Compare previous implementation against new one")
+                PlanSubtask("t1", "history_rag", f"Find older commits and removed code superseded by: {orig_q}", "Trace git history before and during replacement"),
+                PlanSubtask("t2", "code_analysis", f"Inspect legacy headers, deprecated functions, and replacements for: {orig_q}", "Compare previous implementation against new one")
             ]
         else:
-            return create_fallback_plan(run_id, question, round_num)
+            return create_fallback_plan(run_id, orig_q, round_num)
 
         if feedback:
-            # Re-plan adaptation: append targeted query for the specific gap
+            # Re-plan adaptation: append targeted query without nesting
             subtasks.append(
-                PlanSubtask(f"t_replan_{round_num}", "history_rag", f"Targeted search addressing feedback gap: {feedback}", "Refined query targeting missing evidence")
+                PlanSubtask(f"t_replan_{round_num}", "history_rag", f"Targeted search addressing gap: {feedback}", "Refined query targeting missing evidence")
             )
 
         return OrchestrationPlan(
@@ -112,35 +123,57 @@ class OrchestratorAgent:
             intent=intent,
             entities=entities,
             subtasks=subtasks,
+            original_question=orig_q,
             parallel=True,
             needs_clarification=False
         )
 
-    def plan(self, question: str, run_id: str, round_num: int = 1, feedback: Optional[str] = None, blackboard: Any = None) -> OrchestrationPlan:
+    def plan(
+        self,
+        question: str,
+        run_id: str,
+        round_num: int = 1,
+        feedback: Optional[str] = None,
+        blackboard: Any = None,
+        original_question: Optional[str] = None
+    ) -> OrchestrationPlan:
         start_time = time.time()
         tokens_used = 0
         llm_calls = 0
         error_msg = ""
+        orig_q = original_question or question
         plan_obj: Optional[OrchestrationPlan] = None
 
-        # Check LLM availability
         use_llm = os.environ.get("LLM_PROVIDER", "").lower() not in ("mock", "none", "")
 
         if use_llm:
             try:
                 from agents._llm_retry import generate_with_retry
-                user_prompt = f"Question: {question}\nRound: {round_num}\nFeedback: {feedback or 'None'}\nGenerate strict JSON plan conforming to schema."
+                user_prompt = f"Question: {orig_q}\nRound: {round_num}\nFeedback: {feedback or 'None'}\nGenerate strict JSON plan conforming to schema."
+                
+                # First attempt
                 raw_out = generate_with_retry(self.system_prompt, user_prompt)
                 llm_calls += 1
                 tokens_used += len(raw_out) // 4
 
-                # Strip markdown fences if present
                 clean_json = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_out.strip(), flags=re.MULTILINE)
                 parsed = json.loads(clean_json)
                 parsed["run_id"] = run_id
                 parsed["round"] = round_num
 
                 valid, errs = validate_plan_dict(parsed)
+                if not valid and llm_calls < self.max_llm_calls:
+                    # Retry once with error feedback
+                    retry_prompt = f"{user_prompt}\n\nPrevious output had validation errors: {errs}. Fix and return valid JSON only."
+                    raw_retry = generate_with_retry(self.system_prompt, retry_prompt)
+                    llm_calls += 1
+                    tokens_used += len(raw_retry) // 4
+                    clean_retry = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_retry.strip(), flags=re.MULTILINE)
+                    parsed = json.loads(clean_retry)
+                    parsed["run_id"] = run_id
+                    parsed["round"] = round_num
+                    valid, errs = validate_plan_dict(parsed)
+
                 if valid:
                     ent_dict = parsed.get("entities", {})
                     plan_obj = OrchestrationPlan(
@@ -154,22 +187,22 @@ class OrchestratorAgent:
                             time_range=ent_dict.get("time_range")
                         ),
                         subtasks=[PlanSubtask(**s) for s in parsed["subtasks"]],
+                        original_question=orig_q,
                         parallel=parsed.get("parallel", True),
                         needs_clarification=parsed.get("needs_clarification", False)
                     )
                 else:
-                    logger.warning("LLM plan failed validation: %s. Using rule-based generator.", errs)
-                    plan_obj = self.plan_rule_based(question, run_id, round_num, feedback)
+                    logger.warning("LLM plan failed validation after retry (%s). Using rule-based generator.", errs)
+                    plan_obj = self.plan_rule_based(question, run_id, round_num, feedback, orig_q)
             except Exception as e:
                 logger.warning("LLM call failed (%s). Falling back to rule-based planner.", e)
                 error_msg = str(e)
-                plan_obj = self.plan_rule_based(question, run_id, round_num, feedback)
+                plan_obj = self.plan_rule_based(question, run_id, round_num, feedback, orig_q)
         else:
-            plan_obj = self.plan_rule_based(question, run_id, round_num, feedback)
+            plan_obj = self.plan_rule_based(question, run_id, round_num, feedback, orig_q)
 
         duration_ms = (time.time() - start_time) * 1000
 
-        # Log to blackboard if provided
         if blackboard and hasattr(blackboard, "log"):
             blackboard.log(
                 agent="orchestrator",
@@ -185,14 +218,15 @@ class OrchestratorAgent:
         next_round = previous_plan.round + 1
         if next_round > self.max_rounds:
             logger.info("Reached MAX_ROUNDS (%d). Terminating re-planning.", self.max_rounds)
-            # Return current plan marked as not needing further re-plan
             return previous_plan
 
-        # Re-plan targeting missing gaps
+        # Use original question without nesting queries
+        orig_q = previous_plan.original_question or (previous_plan.subtasks[0].sub_query if previous_plan.subtasks else "query")
         return self.plan(
-            question=previous_plan.subtasks[0].sub_query if previous_plan.subtasks else "Software history query",
+            question=orig_q,
             run_id=previous_plan.run_id,
             round_num=next_round,
             feedback=feedback,
-            blackboard=blackboard
+            blackboard=blackboard,
+            original_question=orig_q
         )

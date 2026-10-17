@@ -1,7 +1,7 @@
 """Variant 1: Sequential Coordination Architecture.
 
-Agents run one after another in a fixed linear pipeline:
-Orchestrator -> Code Analysis -> History/RAG -> Issue/PR -> Verification -> (re-run if insufficient) -> Reviewer.
+Agents run one after another in a linear pipeline, strictly following the Orchestrator's plan:
+Orchestrator -> Assigned Retrieval Agents in order -> Verification -> (re-plan if insufficient) -> Reviewer.
 """
 from __future__ import annotations
 
@@ -33,7 +33,6 @@ class SequentialArchitecture(Architecture):
 
         blackboard = Blackboard(question=question, repo_slug=repo_slug, run_id=run_id)
 
-        # Setup agents
         agents = retrieval_agents or {
             "code_analysis": StubRetrievalAgent("code_analysis"),
             "history_rag": StubRetrievalAgent("history_rag"),
@@ -43,39 +42,46 @@ class SequentialArchitecture(Architecture):
 
         round_num = 1
         incomplete = False
+        plan = None
+        v_res = {}
 
         while round_num <= self.max_rounds:
             # 1. Orchestrator
             c_start = time.time()
-            plan = self.orchestrator.plan(question, run_id, round_num=round_num, blackboard=blackboard)
+            if plan is None:
+                plan = self.orchestrator.plan(question, run_id, round_num=round_num, blackboard=blackboard)
+            else:
+                feedback = "; ".join(v_res.get("gaps", ["Need more evidence"]))
+                plan = self.orchestrator.replan(plan, feedback=feedback, blackboard=blackboard)
             coord_overhead_ms += (time.time() - c_start) * 1000
             agents_invoked.append(f"orchestrator_r{round_num}")
 
-            # 2. Sequential execution of retrieval agents in fixed order
-            for agent_name in ["code_analysis", "history_rag", "issue_pr"]:
+            # 2. Sequential execution strictly adhering to the planned subtasks
+            assigned_agent_names = [st.assigned_agent for st in plan.subtasks]
+            for subtask in plan.subtasks:
+                agent_name = subtask.assigned_agent
                 agent = agents.get(agent_name)
                 if agent:
                     agents_invoked.append(agent_name)
-                    # Subquery from plan or original question
-                    subquery = question
-                    for st in plan.subtasks:
-                        if st.assigned_agent == agent_name:
-                            subquery = st.sub_query
-                            break
+                    c_disp = time.time()
+                    subquery = subtask.sub_query
+                    coord_overhead_ms += (time.time() - c_disp) * 1000
 
-                    a_start = time.time()
                     if hasattr(agent, "run"):
-                        # Support stub or pipeline agent
                         try:
                             frags = agent.run(subquery, repo_slug=repo_slug)
                         except TypeError:
+                            blackboard.question = subquery
                             frags = agent.run(blackboard)
                         if isinstance(frags, list):
+                            c_post = time.time()
                             blackboard.post_evidence(agent_name, frags)
-                    coord_overhead_ms += 1.5  # Fixed sequential dispatch overhead
+                            coord_overhead_ms += (time.time() - c_post) * 1000
 
             # 3. Verification Agent
+            c_v = time.time()
             blackboard.set_status(BlackboardStatus.VERIFYING)
+            coord_overhead_ms += (time.time() - c_v) * 1000
             agents_invoked.append("verification")
             v_res = verifier.run(blackboard)
 
@@ -84,7 +90,9 @@ class SequentialArchitecture(Architecture):
             else:
                 if round_num < self.max_rounds:
                     round_num += 1
+                    c_r = time.time()
                     blackboard.set_status(BlackboardStatus.REGATHERING)
+                    coord_overhead_ms += (time.time() - c_r) * 1000
                 else:
                     incomplete = True
                     break
@@ -103,6 +111,8 @@ class SequentialArchitecture(Architecture):
             }
             for e in blackboard.get_evidence()
         ]
+        coord_overhead_ms += (time.time() - c_start) * 1000
+
         reviewer_res = self.reviewer.review(
             {
                 "run_id": run_id,
@@ -113,7 +123,6 @@ class SequentialArchitecture(Architecture):
             },
             blackboard=blackboard
         )
-        coord_overhead_ms += (time.time() - c_start) * 1000
         agents_invoked.append("reviewer")
 
         return self._format_run_output(
