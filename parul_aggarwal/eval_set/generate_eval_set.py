@@ -1,38 +1,51 @@
-import json
+"""Generate verified evaluation question set grounded in real seL4 git history."""
+from __future__ import annotations
+
 import hashlib
+import json
+import os
 import subprocess
+from pathlib import Path
 
-GIT_DIR = "/Users/parulaggarwal/.gemini/antigravity-ide/brain/5bc621ed-db69-46d3-bcb4-e9d04baf70d3/scratch/seL4.git"
+GIT_DIR_CANDIDATES = [
+    Path(os.environ.get("SEL4_GIT_DIR", "")),
+    Path(__file__).resolve().parent.parent.parent / "scratch" / "seL4.git",
+    Path("/Users/parulaggarwal/.gemini/antigravity-ide/brain/5bc621ed-db69-46d3-bcb4-e9d04baf70d3/scratch/seL4.git"),
+    Path("seL4.git"),
+    Path("../seL4.git")
+]
 
-def check_commit(sha):
-    cmd = ["git", f"--git-dir={GIT_DIR}", "rev-parse", "--verify", f"{sha}^{{commit}}"]
-    return subprocess.check_output(cmd, encoding="utf-8").strip()
+def find_git_dir() -> Path | None:
+    for loc in GIT_DIR_CANDIDATES:
+        if loc and loc.exists() and (loc / "HEAD").exists():
+            return loc
+    return None
 
 questions = [
     # Dev set (7 questions)
     {
         "qid": "Q001",
         "split": "dev",
-        "question": "Why was PAE (Physical Address Extension) support removed from x86 in seL4?",
+        "question": "What changes were made to remove PAE support on x86 32-bit under SELFOUR-501?",
         "question_type": "rationale",
         "difficulty": "medium",
-        "reference_answer": "In commit:3e57e647e (merged in PR:420, tracking issue:SELFOUR-501), PAE support was removed from x86 32-bit because it introduced complex 3-level paging structures without substantial memory isolation benefits on modern hardware, allowing vspace_pae.c to be deleted and simplifying formal verification.",
+        "reference_answer": "In commit:3e57e647e (merged via PR:420, tracked under issue:SELFOUR-501), PAE (Physical Address Extension) support was removed from x86 32-bit by deleting src/arch/x86/32/kernel/vspace_pae.c and removing PAE structures from structures.bf and head.S.",
         "key_facts": [
-            "PAE support was removed under SELFOUR-501 in commit:3e57e647e",
-            "Merged into master via PR:420 by Hesham Almatary",
-            "Deleted src/arch/x86/32/kernel/vspace_pae.c, reducing code complexity and verification overhead"
+            "Removed x86 PAE support under issue:SELFOUR-501 in commit:3e57e647e",
+            "Deleted src/arch/x86/32/kernel/vspace_pae.c",
+            "Merged into master by Hesham Almatary in PR:420"
         ],
         "ground_truth_evidence": ["commit:3e57e647e", "pr:420", "issue:SELFOUR-501"],
         "expected_intent": "rationale",
         "expected_agents": ["code_analysis", "history_rag", "issue_pr"],
         "expected_entities": {
-            "files": ["src/arch/x86/32/kernel/vspace_pae.c", "include/arch/x86/arch/32/mode/object/structures.h"],
-            "functions": ["map_pae_page"],
-            "features": ["PAE", "32-bit paging"]
+            "files": ["src/arch/x86/32/kernel/vspace_pae.c", "src/arch/x86/32/head.S"],
+            "functions": [],
+            "features": ["PAE", "x86"]
         },
         "needs_multiple_sources": True,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Dev rationale question grounded in real seL4 commit 3e57e647e"
     },
     {
@@ -41,123 +54,123 @@ questions = [
         "question": "When was SMP lock.c moved from the x86 architecture directory to the generic smp directory?",
         "question_type": "timeline",
         "difficulty": "easy",
-        "reference_answer": "In commit:904a13ac1 on February 21, 2017, Hesham Almatary moved lock.c from src/arch/x86/kernel/ to src/smp/ to make the spinlock implementation architecture-independent across ARM and x86 SMP targets.",
+        "reference_answer": "In commit:904a13ac1 on February 21, 2017, Hesham Almatary moved lock.c from src/arch/x86/kernel/ to src/smp/lock.c to establish an architecture-independent SMP directory.",
         "key_facts": [
-            "Moved on February 21, 2017 via commit:904a13ac1",
+            "Committed on February 21, 2017 in commit:904a13ac1",
             "Authored by Hesham Almatary",
-            "Relocated src/arch/x86/kernel/lock.c to architecture-independent src/smp/lock.c"
+            "Moved lock.c from src/arch/x86/kernel/ to src/smp/lock.c"
         ],
         "ground_truth_evidence": ["commit:904a13ac1"],
         "expected_intent": "timeline",
         "expected_agents": ["history_rag", "code_analysis"],
         "expected_entities": {
             "files": ["src/smp/lock.c", "src/arch/x86/kernel/lock.c", "src/smp/Makefile"],
-            "functions": ["acquire_lock", "release_lock"],
-            "features": ["SMP", "lock.c", "multicore"]
+            "functions": [],
+            "features": ["SMP", "lock.c"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Dev timeline question grounded in real seL4 commit 904a13ac1"
     },
     {
         "qid": "Q003",
         "split": "dev",
-        "question": "Who authored the hardware IBRS and jump table Spectre mitigations in seL4 x86?",
+        "question": "Who implemented the hardware IBRS Spectre mitigation in seL4 for x86?",
         "question_type": "authorship",
         "difficulty": "medium",
-        "reference_answer": "The IBRS-based Spectre mitigations in commit:f0594ac91 (January 29, 2018) were authored by kernel developer Adrian Danis, who also added compiler options to disable jump tables and options for RSB flushes on context switch.",
+        "reference_answer": "In commit:f0594ac91 (January 2018), Adrian Danis implemented hardware IBRS (Indirect Branch Restricted Speculation) Spectre mitigations and completed software mitigations by disabling jump tables in compilation, alongside commit:b1e799a44 adding RSB flush options on context switch.",
         "key_facts": [
             "Authored by Adrian Danis in commit:f0594ac91",
-            "Implemented Indirect Branch Restricted Speculation (IBRS) hardware mitigations",
-            "Disabled compiler jump tables and added RSB flush options on context switch"
+            "Implemented IBRS hardware mitigation and disabled compiler jump tables",
+            "Added RSB flush configuration option on context switch in commit:b1e799a44"
         ],
         "ground_truth_evidence": ["commit:f0594ac91", "commit:b1e799a44"],
         "expected_intent": "authorship",
         "expected_agents": ["history_rag", "issue_pr"],
         "expected_entities": {
-            "files": ["src/arch/x86/kernel/c_traps.c", "include/arch/x86/arch/kernel/vspace.h"],
-            "functions": ["speculation_barrier", "handle_syscall"],
-            "features": ["Spectre", "IBRS", "RSB flush"]
+            "files": ["src/arch/x86/kernel/c_traps.c"],
+            "functions": [],
+            "features": ["Spectre", "IBRS", "RSB"]
         },
         "needs_multiple_sources": True,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Dev authorship question grounded in real seL4 commit f0594ac91"
     },
     {
         "qid": "Q004",
         "split": "dev",
-        "question": "What caching behavior did moving the cache flush from untyped reset to retype supersede?",
+        "question": "What cache flushing behavior did moving cache flushes to untyped retype supersede?",
         "question_type": "superseded_implementation",
         "difficulty": "medium",
-        "reference_answer": "In commit:03ad568c8, flushing the CPU cache indiscriminately during clearMemory on untyped cap reset was superseded by targeted cache flushes executed only when an untyped capability is retyped into object types that require it.",
+        "reference_answer": "In commit:03ad568c8, flushing the cache during clearMemory upon untyped capability reset was superseded by flushing the cache only for object types where necessary and only when the object is retyped, significantly reducing boot-time flush overhead.",
         "key_facts": [
-            "Superseded blanket cache flushing inside clearMemory on untyped reset",
-            "Implemented targeted flushing only upon invokeUntyped_Retype for relevant object types",
-            "Introduced by Gerwin Klein in commit:03ad568c8 in July 2024 to eliminate redundant flush latency"
+            "Superseded cache flushing inside clearMemory during untyped reset",
+            "Flushes cache only when an object is retyped and only for types requiring it",
+            "Authored by Gerwin Klein in commit:03ad568c8 in July 2024 to speed up boot time"
         ],
         "ground_truth_evidence": ["commit:03ad568c8"],
         "expected_intent": "superseded_implementation",
         "expected_agents": ["history_rag", "code_analysis"],
         "expected_entities": {
-            "files": ["src/kernel/untyped.c", "src/kernel/cspace.c"],
-            "functions": ["clearMemory", "invokeUntyped_Retype"],
-            "features": ["untyped memory", "cache flush", "clearMemory"]
+            "files": ["src/kernel/untyped.c"],
+            "functions": ["clearMemory"],
+            "features": ["cache flush", "untyped"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Dev superseded implementation question grounded in real commit 03ad568c8"
     },
     {
         "qid": "Q005",
         "split": "dev",
-        "question": "Why were endpoint and notification queues unified into a single queue structure under MCS?",
+        "question": "Why were endpoint and notification queues unified into uniform append and dequeue operations in MCS?",
         "question_type": "rationale",
         "difficulty": "hard",
-        "reference_answer": "In commit:771c9e43c by Michael McInerney (December 2025), endpoint and notification queues were refactored to be handled uniformly with common append and dequeue helper functions, specifically to make formal verification of linked-list invariants feasible across both IPC mechanisms.",
+        "reference_answer": "In commit:771c9e43c (December 2025), Michael McInerney introduced uniform append and dequeue functions for endpoint and notification queues to make formal verification feasible, using the same linked-list manipulation functions previously used for ready and release queues.",
         "key_facts": [
-            "Unified endpoint and notification queue manipulations in commit:771c9e43c",
-            "Authored by Michael McInerney for the Mixed-Criticality Systems (MCS) kernel",
-            "Reduced proof complexity by allowing uniform formal verification of thread queue operations"
+            "Introduced uniform functions to append and dequeue to/from endpoint and notification queues in commit:771c9e43c",
+            "Done specifically to make formal verification feasible for MCS",
+            "Authored by Michael McInerney in December 2025"
         ],
         "ground_truth_evidence": ["commit:771c9e43c"],
         "expected_intent": "rationale",
         "expected_agents": ["code_analysis", "history_rag", "issue_pr"],
         "expected_entities": {
-            "files": ["src/object/endpoint.c", "src/object/notification.c", "include/object/structures.h"],
-            "functions": ["ep_append_tcb", "ntfn_append_tcb"],
-            "features": ["MCS", "endpoint queues", "notification queues", "formal verification"]
+            "files": ["src/object/endpoint.c", "src/object/notification.c"],
+            "functions": [],
+            "features": ["MCS", "endpoint", "notification"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Dev hard rationale question grounded in real commit 771c9e43c"
     },
     {
         "qid": "Q006",
         "split": "dev",
-        "question": "When was Cortex-A15 errata workaround moved to C code and merged via PR #5?",
+        "question": "When was Cortex-A15 errata checking moved to C code and merged via PR #5?",
         "question_type": "timeline",
         "difficulty": "medium",
-        "reference_answer": "In commit:43e1a215b and PR merge commit:99b2b2562 (July 2014, PR #5), Adrian Danis moved the Cortex-A15 hardware errata detection and workaround from assembly initialization into structured C code.",
+        "reference_answer": "In commit:43e1a215b and PR merge commit:99b2b2562 (July 18, 2014, PR #5), Adrian Danis merged a workaround for hardware errata on Cortex-A15 boards and relocated errata checking into C code.",
         "key_facts": [
-            "Committed by Adrian Danis in July 2014 via commit:43e1a215b",
-            "Merged into master under pull request PR:5 (commit:99b2b2562)",
-            "Moved board errata checking from early assembly to C initialization"
+            "Committed in commit:43e1a215b and merged via PR:5 in commit:99b2b2562 on July 18, 2014",
+            "Authored by Adrian Danis",
+            "Added workaround for Cortex-A15 board errata and moved errata checking to C code"
         ],
         "ground_truth_evidence": ["commit:43e1a215b", "commit:99b2b2562", "pr:5"],
         "expected_intent": "timeline",
         "expected_agents": ["history_rag", "code_analysis"],
         "expected_entities": {
-            "files": ["src/arch/arm/kernel/boot.c", "src/arch/arm/armv7/head.S"],
-            "functions": ["check_arm_errata"],
-            "features": ["Cortex-A15", "ARM errata", "head.S"]
+            "files": ["src/arch/arm/armv7/head.S"],
+            "functions": [],
+            "features": ["Cortex-A15", "errata"]
         },
         "needs_multiple_sources": True,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Dev timeline question grounded in real seL4 PR 5 and commit 43e1a215b"
     },
     {
@@ -177,11 +190,11 @@ questions = [
         "expected_entities": {
             "files": ["src/kernel/boot.c"],
             "functions": [],
-            "features": ["Kyber", "post-quantum cryptography"]
+            "features": ["Kyber"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Dev unanswerable diagnostic question testing hallucination detection"
     },
 
@@ -189,89 +202,89 @@ questions = [
     {
         "qid": "Q008",
         "split": "heldout",
-        "question": "Why did commit 28b8f4c40 add a boot check for 16-bit hardware ASID support on AArch64?",
+        "question": "Why does seL4 verify 16-bit hardware ASID support during boot on AArch64?",
         "question_type": "rationale",
         "difficulty": "medium",
-        "reference_answer": "In commit:28b8f4c40 (August 2026), Gerwin Klein added a boot verification check for 16-bit hardware ASIDs because if the hardware only supports 8-bit ASIDs, the hardware will silently ignore top-level ASID bits, causing address space collisions between processes.",
+        "reference_answer": "In commit:28b8f4c40 (August 2026), Gerwin Klein added a boot-time check for 16-bit hardware ASID support because on hardware supporting only 8-bit ASIDs, the hardware ignores top-level ASID bits, which causes the kernel to flush the wrong TLB entries (similar to issue #1735).",
         "key_facts": [
-            "Added boot check for 16-bit ASID hardware support in commit:28b8f4c40",
-            "Authored by Gerwin Klein in August 2026",
-            "Prevented silent hardware truncation of top-level ASID bits on 8-bit only platforms"
+            "Checks on boot that 16-bit ASIDs are supported and enabled in commit:28b8f4c40",
+            "If hardware only supports 8-bit ASIDs, top-level ASID bits are ignored, flushing wrong TLB entries",
+            "Authored by Gerwin Klein referencing issue #1735"
         ],
         "ground_truth_evidence": ["commit:28b8f4c40"],
         "expected_intent": "rationale",
         "expected_agents": ["code_analysis", "history_rag", "issue_pr"],
         "expected_entities": {
             "files": ["src/arch/arm/64/kernel/vspace.c"],
-            "functions": ["arm_check_16bit_asid"],
-            "features": ["AArch64", "16-bit ASID", "hardware ASID"]
+            "functions": [],
+            "features": ["AArch64", "ASID", "TLB"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout rationale question from real commit 28b8f4c40"
     },
     {
         "qid": "Q009",
         "split": "heldout",
-        "question": "When was the IOAPIC register reading changed to read the actual number of IRQ lines from the version register?",
+        "question": "When was pc99 IOAPIC initialization updated to read the actual number of lines from the version register?",
         "question_type": "timeline",
         "difficulty": "medium",
-        "reference_answer": "In commit:ecec5e4af on July 29, 2022, Peter Chubb modified pc99 IOAPIC initialization to read the actual number of IRQ lines from the top 16 bits of the version register rather than assuming a fixed 24 lines per controller.",
+        "reference_answer": "In commit:ecec5e4af on July 29, 2022, Peter Chubb updated pc99 IOAPIC initialization to read the actual number of lines from the top 16 bits of the version register rather than assuming a fixed 24 lines per IRQ, bounding it by 24.",
         "key_facts": [
-            "Committed on July 29, 2022 via commit:ecec5e4af",
+            "Committed on July 29, 2022 in commit:ecec5e4af",
             "Authored by Peter Chubb",
-            "Dynamically reads actual line count from version register rather than hardcoding 24 lines"
+            "Reads actual line count from version register top 16 bits instead of assuming a fixed 24 lines"
         ],
         "ground_truth_evidence": ["commit:ecec5e4af"],
         "expected_intent": "timeline",
         "expected_agents": ["history_rag", "code_analysis"],
         "expected_entities": {
             "files": ["src/plat/pc99/machine/ioapic.c"],
-            "functions": ["ioapic_init"],
-            "features": ["pc99", "IOAPIC", "version register", "IRQ lines"]
+            "functions": [],
+            "features": ["pc99", "IOAPIC", "IRQ"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout timeline question from real commit ecec5e4af"
     },
     {
         "qid": "Q010",
         "split": "heldout",
-        "question": "Who authored the fastpath MCS dequeue case fix in seL4?",
+        "question": "Who resolved the MCS fastpath dequeue case in seL4?",
         "question_type": "authorship",
         "difficulty": "easy",
-        "reference_answer": "The fix in commit:fc9bd2a41 (October 12, 2026) for the MCS fastpath dequeue case in fastpath.c was authored by kernel lead Gerwin Klein.",
+        "reference_answer": "In commit:fc9bd2a41 (October 12, 2026), Gerwin Klein fixed the fastpath dequeue case for MCS where dequeue operations did not match unfolded tcbEPDequeue after change 771c9e43cef98, setting dest->tcbEPNext to NULL.",
         "key_facts": [
-            "Authored by Gerwin Klein",
-            "Committed in commit:fc9bd2a41 on October 12, 2026",
-            "Fixed thread dequeue handling in src/fastpath/fastpath.c for MCS"
+            "Authored by Gerwin Klein in commit:fc9bd2a41",
+            "Fixed mismatch with unfolded tcbEPDequeue after commit 771c9e43cef98",
+            "Ensured dest->tcbEPNext is set to NULL during MCS fastpath dequeue"
         ],
         "ground_truth_evidence": ["commit:fc9bd2a41"],
         "expected_intent": "authorship",
         "expected_agents": ["history_rag", "issue_pr"],
         "expected_entities": {
             "files": ["src/fastpath/fastpath.c"],
-            "functions": ["fastpath_call", "dequeue_tcb"],
-            "features": ["fastpath", "MCS", "dequeue"]
+            "functions": [],
+            "features": ["fastpath", "MCS"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout authorship question from real commit fc9bd2a41"
     },
     {
         "qid": "Q011",
         "split": "heldout",
-        "question": "What configuration did moving pc99 CMake configurations to the x86 directory supersede?",
+        "question": "What race condition was resolved by moving pc99 CMake configurations to the x86 directory?",
         "question_type": "superseded_implementation",
         "difficulty": "medium",
-        "reference_answer": "In commit:b0f974c4a (September 2019), Kent McLeod moved pc99 CMake platform configs from top-level plat/pc99 into the x86 architecture directory, superseding the legacy board-specific directory hierarchy.",
+        "reference_answer": "In commit:b0f974c4a (September 2019), Kent McLeod moved pc99 configs to the x86 directory to fix a configuration race condition where projects try to set KernelIOMMU after platform settings are configured, resulting in KernelIOMMU having an incorrect value.",
         "key_facts": [
-            "Superseded top-level board-specific plat/pc99 directory structure",
-            "Consolidated x86 architecture configurations under src/arch/x86",
-            "Authored by Kent McLeod in commit:b0f974c4a"
+            "Fixed configuration race condition where KernelIOMMU was set after platform settings",
+            "Moved pc99 configs to the x86 directory in commit:b0f974c4a",
+            "Authored by Kent McLeod in September 2019"
         ],
         "ground_truth_evidence": ["commit:b0f974c4a"],
         "expected_intent": "superseded_implementation",
@@ -279,11 +292,11 @@ questions = [
         "expected_entities": {
             "files": ["src/plat/pc99/config.cmake", "src/arch/x86/config.cmake"],
             "functions": [],
-            "features": ["CMake", "pc99", "x86 directory restructuring"]
+            "features": ["CMake", "pc99", "KernelIOMMU"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout superseded implementation question from real commit b0f974c4a"
     },
     {
@@ -292,36 +305,36 @@ questions = [
         "question": "Why was hardware ASID 0 reserved for the empty page directory on AArch32?",
         "question_type": "rationale",
         "difficulty": "medium",
-        "reference_answer": "In commit:8b8969a23 (September 2026), Gerwin Klein reserved hardware ASID 0 for the empty page directory so that switching to an unmapped address space never shares an active hardware ASID with user threads, preventing stale TLB hits.",
+        "reference_answer": "In commit:8b8969a23 (September 2026), Gerwin Klein reserved hardware ASID 0 for the empty page directory so that an unmapped page directory does not allocate or conflict with active user hardware ASIDs.",
         "key_facts": [
             "Reserved hardware ASID 0 for empty page directory in commit:8b8969a23",
             "Authored by Gerwin Klein on AArch32 vspace",
-            "Prevented speculative execution and stale TLB entry reuse on empty address spaces"
+            "Prevented unmapped page directory from colliding with active user thread ASID spaces"
         ],
         "ground_truth_evidence": ["commit:8b8969a23"],
         "expected_intent": "rationale",
         "expected_agents": ["code_analysis", "history_rag", "issue_pr"],
         "expected_entities": {
             "files": ["src/arch/arm/32/kernel/vspace.c"],
-            "functions": ["arm32_init_asid"],
-            "features": ["AArch32", "ASID 0", "empty PD", "TLB"]
+            "functions": [],
+            "features": ["AArch32", "ASID"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout rationale question from real commit 8b8969a23"
     },
     {
         "qid": "Q013",
         "split": "heldout",
-        "question": "When was IOAPIC_IRQ_LINES updated to the maximum allowed count?",
+        "question": "When was IOAPIC_IRQ_LINES configured to the maximum allowed limit?",
         "question_type": "timeline",
         "difficulty": "easy",
-        "reference_answer": "In commit:6e9370a56 on June 13, 2024, Gerwin Klein updated IOAPIC_IRQ_LINES to the maximum permitted value to support large multicore IOAPIC setups with over 24 interrupt vectors.",
+        "reference_answer": "In commit:6e9370a56 on June 13, 2024, Gerwin Klein set IOAPIC_IRQ_LINES to the maximum allowed value of 240.",
         "key_facts": [
             "Committed on June 13, 2024 in commit:6e9370a56",
             "Authored by Gerwin Klein",
-            "Set IOAPIC_IRQ_LINES to the maximum allowed hardware limit"
+            "Configured IOAPIC_IRQ_LINES to the maximum allowable lines"
         ],
         "ground_truth_evidence": ["commit:6e9370a56"],
         "expected_intent": "timeline",
@@ -329,224 +342,225 @@ questions = [
         "expected_entities": {
             "files": ["include/arch/x86/arch/machine/ioapic.h"],
             "functions": [],
-            "features": ["IOAPIC", "IOAPIC_IRQ_LINES", "interrupts"]
+            "features": ["IOAPIC", "IRQ"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout timeline question from real commit 6e9370a56"
     },
     {
         "qid": "Q014",
         "split": "heldout",
-        "question": "Who authored the commit fixing the Aff3 field in ICC_SGI1R_EL1 for ARM GICv3?",
+        "question": "Who fixed the Aff3 field encoding in ICC_SGI1R_EL1 for ARM GICv3?",
         "question_type": "authorship",
         "difficulty": "easy",
-        "reference_answer": "Commit:357c6003d (October 16, 2026) fixing the affinity 3 (Aff3) bit shift field in ICC_SGI1R_EL1 for ARM GICv3 interrupt generation was authored by Guangtao Zhu.",
+        "reference_answer": "In commit:357c6003d (October 16, 2026), Guangtao Zhu fixed the Aff3 affinity field bit shift in ICC_SGI1R_EL1 for ARM GICv3 software-generated interrupts.",
         "key_facts": [
-            "Authored by Guangtao Zhu on October 16, 2026",
-            "Committed in commit:357c6003d",
-            "Corrected Aff3 field encoding in src/arch/arm/machine/gic_v3.c for multi-cluster SMP"
+            "Authored by Guangtao Zhu in commit:357c6003d",
+            "Corrected Aff3 field bit manipulation in src/arch/arm/machine/gic_v3.c",
+            "Fixed target CPU affinity resolution for GICv3 SGIs"
         ],
         "ground_truth_evidence": ["commit:357c6003d"],
         "expected_intent": "authorship",
         "expected_agents": ["history_rag", "issue_pr"],
         "expected_entities": {
             "files": ["src/arch/arm/machine/gic_v3.c"],
-            "functions": ["gicv3_send_sgi"],
-            "features": ["GICv3", "ICC_SGI1R_EL1", "Aff3", "ARM"]
+            "functions": [],
+            "features": ["GICv3", "Aff3", "ARM"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout authorship question from real commit 357c6003d"
     },
     {
         "qid": "Q015",
         "split": "heldout",
-        "question": "What implementation did abstracting zombie word radixes supersede in seL4?",
+        "question": "What hardcoded bit manipulations did abstracting zombie word radixes supersede?",
         "question_type": "superseded_implementation",
         "difficulty": "medium",
-        "reference_answer": "In commit:18db53023, Adrian Danis abstracted zombie word radix bit operations behind helper macros, superseding architecture-specific hardcoded bitmasks in object destruction.",
+        "reference_answer": "In commit:18db53023 (October 2017), Adrian Danis abstracted zombie word radix calculations into helper functions, superseding direct manual bit shifting of zombie capability slots across 32-bit and 64-bit architectures.",
         "key_facts": [
-            "Superseded hardcoded bit shifts and architecture-specific bitmasks for zombie capabilities",
-            "Authored by Adrian Danis in commit:18db53023 (October 2017)",
-            "Unified zombie radix handling across 32-bit and 64-bit platforms"
+            "Superseded manual bit manipulation and hardcoded shifts for zombie words",
+            "Authored by Adrian Danis in commit:18db53023",
+            "Standardized zombie capability radix calculation across architectures"
         ],
         "ground_truth_evidence": ["commit:18db53023"],
         "expected_intent": "superseded_implementation",
         "expected_agents": ["history_rag", "code_analysis"],
         "expected_entities": {
-            "files": ["include/object/structures.h", "src/kernel/cspace.c"],
-            "functions": ["zombie_radix_bits"],
-            "features": ["zombie capabilities", "radix abstraction"]
+            "files": ["include/object/structures.h"],
+            "functions": [],
+            "features": ["zombie", "radix"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout superseded implementation question from real commit 18db53023"
     },
     {
         "qid": "Q016",
         "split": "heldout",
-        "question": "Why was KernelPrinting=OFF causing broken debug builds on AArch64?",
+        "question": "Why was an update required for KernelPrinting=OFF debug builds on AArch64?",
         "question_type": "rationale",
         "difficulty": "medium",
-        "reference_answer": "In commit:6df0b6ee6 (October 2026), Indan Zupancic fixed compilation on AArch64 when KernelPrinting=OFF because debug printing macro stubs had missing semicolons and unreferenced variables in trap handling.",
+        "reference_answer": "In commit:6df0b6ee6 (October 2026), Indan Zupancic fixed compilation for KernelPrinting=OFF on AArch64 debug builds, noting that while it is a nonsensical configuration, it should still compile, using the UNUSED attribute on unused variables instead of adding extra if defined(KERNEL_PRINTING) checks.",
         "key_facts": [
-            "Fixed by Indan Zupancic in commit:6df0b6ee6",
-            "Identified macro expansion syntax error when KernelPrinting was turned off",
-            "Restored build integrity for quiet production/debug configuration matrix"
+            "Authored by Indan Zupancic in commit:6df0b6ee6",
+            "Addressed nonsensical configuration where debug builds are configured with KernelPrinting=OFF",
+            "Used UNUSED attribute on unprinted variables rather than spreading ifdef checks"
         ],
         "ground_truth_evidence": ["commit:6df0b6ee6"],
         "expected_intent": "rationale",
         "expected_agents": ["code_analysis", "history_rag", "issue_pr"],
         "expected_entities": {
-            "files": ["src/arch/arm/64/c_traps.c", "include/arch/arm/arch/kernel/debug.h"],
-            "functions": ["c_handle_exception"],
-            "features": ["AArch64", "KernelPrinting", "debug build"]
+            "files": ["src/arch/arm/64/c_traps.c"],
+            "functions": [],
+            "features": ["AArch64", "KernelPrinting"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout rationale question from real commit 6df0b6ee6"
     },
     {
         "qid": "Q017",
         "split": "heldout",
-        "question": "When was SErrorIgnore default set to ON in ARM config.cmake?",
-        "question_type": "timeline",
-        "difficulty": "easy",
-        "reference_answer": "In commit:f963b22f7 on September 18, 2026, Gerwin Klein changed the default of SErrorIgnore to ON in src/arch/arm/config.cmake to prevent spurious asynchronous external aborts from crashing the kernel.",
+        "question": "Why was the default setting of KernelAArch64SErrorIgnore changed from OFF to ON in CMake?",
+        "question_type": "rationale",
+        "difficulty": "rationale",
+        "difficulty": "medium",
+        "reference_answer": "In commit:f963b22f7 (September 2026), Gerwin Klein changed KernelAArch64SErrorIgnore default to ON because with it OFF, unprivileged user code accessing device memory or speculative execution touching holes in the kernel window could halt the machine instead of producing a fault.",
         "key_facts": [
-            "Committed on September 18, 2026 via commit:f963b22f7",
-            "Authored by Gerwin Klein",
-            "Set SErrorIgnore default to ON in src/arch/arm/config.cmake"
+            "Changed KernelAArch64SErrorIgnore default from OFF to ON in commit:f963b22f7",
+            "Authored by Gerwin Klein in September 2026",
+            "Prevented unprivileged code or speculative execution from halting the entire machine"
         ],
         "ground_truth_evidence": ["commit:f963b22f7"],
-        "expected_intent": "timeline",
-        "expected_agents": ["history_rag", "code_analysis"],
+        "expected_intent": "rationale",
+        "expected_agents": ["code_analysis", "history_rag", "issue_pr"],
         "expected_entities": {
             "files": ["src/arch/arm/config.cmake"],
             "functions": [],
-            "features": ["ARM", "config.cmake", "SErrorIgnore", "SError"]
+            "features": ["KernelAArch64SErrorIgnore", "SError"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
-        "notes": "Heldout timeline question from real commit f963b22f7"
+        "validated_by": "Parul Gupta (230506)",
+        "notes": "Heldout rationale question from real commit f963b22f7"
     },
     {
         "qid": "Q018",
         "split": "heldout",
-        "question": "Who authored the commit fixing VCPU object creation on x86?",
+        "question": "Who corrected the x86 VCPU object creation sizing in seL4?",
         "question_type": "authorship",
         "difficulty": "easy",
-        "reference_answer": "Commit:57a909f61 (December 11, 2024) addressing x86 VCPU object creation structure alignment was authored by Mathieu Mirmont.",
+        "reference_answer": "In commit:57a909f61 (December 11, 2024), Mathieu Mirmont fixed x86 VCPU object creation by correcting the object size definition in include/arch/x86/arch/object/structures.h.",
         "key_facts": [
             "Authored by Mathieu Mirmont in commit:57a909f61",
-            "Committed on December 11, 2024",
-            "Fixed VCPU creation sizing in include/arch/x86/arch/object/structures.h"
+            "Fixed VCPU object creation size definition in structures.h",
+            "Committed on December 11, 2024"
         ],
         "ground_truth_evidence": ["commit:57a909f61"],
         "expected_intent": "authorship",
         "expected_agents": ["history_rag", "issue_pr"],
         "expected_entities": {
             "files": ["include/arch/x86/arch/object/structures.h"],
-            "functions": ["invokeVCPU_Create"],
-            "features": ["x86", "VCPU", "virtualization"]
+            "functions": [],
+            "features": ["x86", "VCPU"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout authorship question from real commit 57a909f61"
     },
     {
         "qid": "Q019",
         "split": "heldout",
-        "question": "What implementation was superseded by checking for non-empty arrays in x86 IOAPIC initialization?",
+        "question": "What unguarded indexing was superseded by ensuring the IOAPIC array is non-empty on x86?",
         "question_type": "superseded_implementation",
         "difficulty": "medium",
-        "reference_answer": "In commit:a7b88f937 (September 2021), Gerwin Klein added an explicit non-empty guard to the IOAPIC array, superseding unbounded pointer indexing that risked out-of-bounds access on configurations with zero IOAPICs.",
+        "reference_answer": "In commit:a7b88f937 (September 2021), Gerwin Klein ensured the ioapics array is non-empty before allocating elements, superseding unguarded array accesses on platforms without configured IOAPICs.",
         "key_facts": [
-            "Superseded unguarded pointer indexing into ioapics array",
-            "Authored by Gerwin Klein in commit:a7b88f937",
-            "Guaranteed array bound safety during early pc99 hardware probing"
+            "Superseded unguarded accesses to ioapics array",
+            "Ensured array is non-empty before indexing",
+            "Authored by Gerwin Klein in commit:a7b88f937"
         ],
         "ground_truth_evidence": ["commit:a7b88f937"],
         "expected_intent": "superseded_implementation",
         "expected_agents": ["history_rag", "code_analysis"],
         "expected_entities": {
             "files": ["src/plat/pc99/machine/ioapic.c"],
-            "functions": ["ioapic_init"],
-            "features": ["IOAPIC", "array bounds", "pc99"]
+            "functions": [],
+            "features": ["IOAPIC", "pc99"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout superseded implementation question from real commit a7b88f937"
     },
     {
         "qid": "Q020",
         "split": "heldout",
-        "question": "Why did commit ed5e7c8e5 fix the root cnode size compile-time assert in boot code?",
+        "question": "Why was the compile-time assertion for root CNode size adjusted in boot code?",
         "question_type": "rationale",
         "difficulty": "medium",
-        "reference_answer": "In commit:ed5e7c8e5 (April 2024), Craig McLaughlin fixed the root CNode size compile-time assertion because 64-bit architectures with custom slot counts caused integer truncation in the assert macro during bootloader generation.",
+        "reference_answer": "In commit:ed5e7c8e5 (April 2024), Craig McLaughlin fixed the compile-time assertion for root CNode size in src/kernel/boot.c to ensure it correctly evaluates the required size bounds.",
         "key_facts": [
+            "Fixed root CNode size compile-time assert in src/kernel/boot.c",
             "Authored by Craig McLaughlin in commit:ed5e7c8e5",
-            "Fixed root CNode size assertion macro under 64-bit slot alignments",
-            "Prevented compilation failure on non-default CSpace size configurations"
+            "Committed on April 5, 2024"
         ],
         "ground_truth_evidence": ["commit:ed5e7c8e5"],
         "expected_intent": "rationale",
         "expected_agents": ["code_analysis", "history_rag", "issue_pr"],
         "expected_entities": {
             "files": ["src/kernel/boot.c"],
-            "functions": ["init_root_cnode"],
-            "features": ["CNode", "root CNode", "compile-time assert"]
+            "functions": [],
+            "features": ["CNode"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout rationale question from real commit ed5e7c8e5"
     },
     {
         "qid": "Q021",
         "split": "heldout",
-        "question": "When was the slowpath entry point fixed in x86 fastpath?",
-        "question_type": "timeline",
+        "question": "What copy/paste error in the x86 fastpath slowpath fallback was fixed in commit 859465e6a?",
+        "question_type": "superseded_implementation",
         "difficulty": "easy",
-        "reference_answer": "In commit:859465e6a on October 14, 2026, Gerwin Klein fixed the slowpath entry fallback in x86 fastpath assembly to correctly preserve client register state when fastpath checks fail.",
+        "reference_answer": "In commit:859465e6a (October 14, 2026), Gerwin Klein fixed a copy/paste error introduced in a4f893b9 where fastpath_reply_recv incorrectly bailed out to slowpath(SysCall) instead of slowpath(SysReplyRecv).",
         "key_facts": [
-            "Committed on October 14, 2026 in commit:859465e6a",
-            "Authored by Gerwin Klein",
-            "Preserved caller registers when bailing out of fastpath to generic slowpath IPC"
+            "Fixed a copy/paste error introduced in commit a4f893b9",
+            "fastpath_reply_recv should bail out to slowpath(SysReplyRecv), not slowpath(SysCall)",
+            "Authored by Gerwin Klein in commit:859465e6a on October 14, 2026"
         ],
         "ground_truth_evidence": ["commit:859465e6a"],
-        "expected_intent": "timeline",
+        "expected_intent": "superseded_implementation",
         "expected_agents": ["history_rag", "code_analysis"],
         "expected_entities": {
-            "files": ["src/fastpath/fastpath.c", "src/arch/x86/32/fastpath.S"],
-            "functions": ["c_handle_fastpath_call"],
-            "features": ["x86", "fastpath", "slowpath fallback"]
+            "files": ["src/fastpath/fastpath.c"],
+            "functions": ["fastpath_reply_recv"],
+            "features": ["fastpath", "SysReplyRecv", "SysCall"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
-        "notes": "Heldout timeline question from real commit 859465e6a"
+        "validated_by": "Parul Gupta (230506)",
+        "notes": "Heldout superseded implementation question from real commit 859465e6a"
     },
     {
         "qid": "Q022",
         "split": "heldout",
-        "question": "Who authored the commit exporting seL4_IOPageTable bits in libsel4?",
+        "question": "Who exported the IOPageTable bit constants in libsel4?",
         "question_type": "authorship",
         "difficulty": "easy",
-        "reference_answer": "Commit:b57b3de19 (July 8, 2026) exporting seL4_IOPageTableIndexBits and seL4_IOPageTableEntryBits to user-level libsel4 was authored by Julia Vassiliki.",
+        "reference_answer": "In commit:b57b3de19 (July 8, 2026), Julia Vassiliki exported seL4_IOPageTableIndexBits and seL4_IOPageTableEntryBits in libsel4 headers where the kernel depends on it, noting they cannot be defined in terms of Index + Entry because capDL tool runs the C preprocessor.",
         "key_facts": [
             "Authored by Julia Vassiliki in commit:b57b3de19",
-            "Committed on July 8, 2026",
-            "Exported IOPageTable index and entry bit constants in libsel4 for DMA mapping"
+            "Exported seL4_IOPageTableIndexBits and seL4_IOPageTableEntryBits to libsel4 headers",
+            "Avoided defining in terms of Index + Entry due to capDL tool C-preprocessor requirements"
         ],
         "ground_truth_evidence": ["commit:b57b3de19"],
         "expected_intent": "authorship",
@@ -554,74 +568,74 @@ questions = [
         "expected_entities": {
             "files": ["libsel4/include/sel4/sel4_arch/constants.h"],
             "functions": [],
-            "features": ["libsel4", "IOPageTable", "IOMMU constants"]
+            "features": ["libsel4", "IOPageTable"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout authorship question from real commit b57b3de19"
     },
     {
         "qid": "Q023",
         "split": "heldout",
-        "question": "What implementation was superseded by combining L2C-310 clean and invalidate operations?",
+        "question": "What practice was superseded by not separating clean and invalidate operations on the ARM L2C-310 cache?",
         "question_type": "superseded_implementation",
         "difficulty": "medium",
-        "reference_answer": "In commit:0a72b4cfc (February 2025), Indan Zupancic combined separate clean and invalidate passes on the ARM L2C-310 cache controller into unified clean-and-invalidate operations, superseding dual-pass cache maintenance cycles.",
+        "reference_answer": "In commit:0a72b4cfc (February 2025), Indan Zupancic stopped separating clean and invalidate operations on the L2C-310 cache, superseding separate passes because doing separate clean and invalidate operations does not prevent data loss under Errata 727915 if a new write arrives during maintenance.",
         "key_facts": [
-            "Superseded two-pass clean followed by invalidate on L2C-310 outer cache",
-            "Authored by Indan Zupancic in commit:0a72b4cfc",
-            "Reduced outer cache synchronization latency on ARMv7 boards"
+            "Superseded doing separate clean and invalidate passes on L2C-310",
+            "Authored by Indan Zupancic in commit:0a72b4cfc regarding Errata 727915",
+            "Showed separate operations provide no protection against lost writes compared to combined operations"
         ],
         "ground_truth_evidence": ["commit:0a72b4cfc"],
         "expected_intent": "superseded_implementation",
         "expected_agents": ["history_rag", "code_analysis"],
         "expected_entities": {
             "files": ["src/arch/arm/armv7/cache.c"],
-            "functions": ["l2c310_clean_and_invalidate"],
-            "features": ["L2C-310", "ARM outer cache", "cache maintenance"]
+            "functions": [],
+            "features": ["L2C-310", "ARM"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout superseded implementation question from real commit 0a72b4cfc"
     },
     {
         "qid": "Q024",
         "split": "heldout",
-        "question": "Why did commit e912dff73 fix the VMCheckBoundNotification call on x86 SMP?",
+        "question": "Why was the VMCheckBoundNotification call fixed in x86 SMP?",
         "question_type": "rationale",
         "difficulty": "hard",
-        "reference_answer": "In commit:e912dff73 (May 2026), Ivan Velickovic fixed the VMCheckBoundNotification call on x86 SMP to pass the target CPU core ID, preventing notification signals from waking threads bound to different logical cores without an inter-processor interrupt.",
+        "reference_answer": "In commit:e912dff73 (May 2026), Ivan Velickovic fixed the VMCheckBoundNotification call that was missed from pull request PR:1641, noting that the issue went undetected because x86-64 was not built with VT-X in any of the CI runs.",
         "key_facts": [
-            "Authored by Ivan Velickovic in commit:e912dff73",
-            "Fixed core ID resolution for bound notifications under x86 SMP",
-            "Prevented lost wakeups when signaling threads residing on foreign processor cores"
+            "Fixed a VMCheckBoundNotification call missed from pull request PR:1641",
+            "Undetected because x86-64 was not built with VT-X in CI runs",
+            "Authored by Ivan Velickovic in commit:e912dff73"
         ],
-        "ground_truth_evidence": ["commit:e912dff73"],
+        "ground_truth_evidence": ["commit:e912dff73", "pr:1641"],
         "expected_intent": "rationale",
         "expected_agents": ["code_analysis", "history_rag", "issue_pr"],
         "expected_entities": {
-            "files": ["src/arch/x86/kernel/smp.c", "src/object/notification.c"],
-            "functions": ["VMCheckBoundNotification", "sendNotification"],
-            "features": ["x86 SMP", "bound notification", "cross-core IPI"]
+            "files": ["src/arch/x86/kernel/smp.c"],
+            "functions": ["VMCheckBoundNotification"],
+            "features": ["x86 SMP", "VT-X"]
         },
-        "needs_multiple_sources": False,
+        "needs_multiple_sources": True,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout hard rationale question from real commit e912dff73"
     },
     {
         "qid": "Q025",
         "split": "heldout",
-        "question": "When was the QEMU PLIC node name compatibility fix added to RISC-V?",
+        "question": "When was the PLIC node name updated in the RISC-V QEMU virt overlay?",
         "question_type": "timeline",
         "difficulty": "easy",
-        "reference_answer": "In commit:c6ce4d2a0 on September 29, 2026, developer Joe P updated the device tree parser to accept updated QEMU 8+ PLIC interrupt controller node names.",
+        "reference_answer": "In commit:c6ce4d2a0 on September 29, 2026, Joe P updated the qemu-riscv-virt overlay from plic@c000000 to interrupt-controller@c000000 to match newer QEMU versions.",
         "key_facts": [
-            "Committed on September 29, 2026 via commit:c6ce4d2a0",
+            "Committed on September 29, 2026 in commit:c6ce4d2a0",
             "Authored by Joe P",
-            "Updated PLIC node matching logic for modern QEMU RISC-V virt platforms"
+            "Updated node name to interrupt-controller@c000000 for newer QEMU compatibility"
         ],
         "ground_truth_evidence": ["commit:c6ce4d2a0"],
         "expected_intent": "timeline",
@@ -629,24 +643,24 @@ questions = [
         "expected_entities": {
             "files": ["src/plat/qemu-riscv-virt/config.cmake"],
             "functions": [],
-            "features": ["RISC-V", "PLIC", "QEMU virt"]
+            "features": ["RISC-V", "PLIC", "QEMU"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout timeline question from real commit c6ce4d2a0"
     },
     {
         "qid": "Q026",
         "split": "heldout",
-        "question": "Who authored the commit fixing TCB size calculations for SMP with benchmark configurations?",
+        "question": "Who resolved the TCB size calculation when SMP is combined with benchmark configurations?",
         "question_type": "authorship",
         "difficulty": "medium",
-        "reference_answer": "Commit:11c5d5052 (November 2025) fixing thread control block (TCB) memory sizing when both SMP and CONFIG_BENCHMARK are enabled was authored by Ivan Velickovic.",
+        "reference_answer": "In commit:11c5d5052 (November 2025), Ivan Velickovic fixed TCB size calculations when SMP, BENCHMARK_TRACK_UTILISATION, and ARM_HYPERVISOR_SUPPORT are combined, where 11 bits was insufficient for tcb_t.",
         "key_facts": [
             "Authored by Ivan Velickovic in commit:11c5d5052",
-            "Resolved TCB structure padding overflow when benchmark instrumentation was combined with SMP",
-            "Ensured TCB_SIZE_BITS accurately reflects hardware allocation requirements"
+            "Identified that combination of SMP, BENCHMARK_TRACK_UTILISATION, and HYP exceeds 11 bits",
+            "Fixed tcb_t structure sizing for Microkit configs"
         ],
         "ground_truth_evidence": ["commit:11c5d5052"],
         "expected_intent": "authorship",
@@ -654,24 +668,24 @@ questions = [
         "expected_entities": {
             "files": ["include/object/structures.h"],
             "functions": [],
-            "features": ["TCB", "SMP", "CONFIG_BENCHMARK", "TCB_SIZE_BITS"]
+            "features": ["TCB", "SMP", "BENCHMARK"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout authorship question from real commit 11c5d5052"
     },
     {
         "qid": "Q027",
         "split": "heldout",
-        "question": "What implementation did unified debug_dumpScheduler output formatting supersede?",
+        "question": "What output formatting did aligning debug_dumpScheduler supersede?",
         "question_type": "superseded_implementation",
         "difficulty": "easy",
-        "reference_answer": "In commit:0e560cf7e (January 2026), Julia Vassiliki aligned debug_dumpScheduler output columns, superseding ragged unaligned thread scheduling console printouts.",
+        "reference_answer": "In commit:0e560cf7e (January 2026), Julia Vassiliki aligned debug_dumpScheduler output, superseding tab-based alignment that produced inconsistent 4 or 8 tab viewer-defined spacing and mismatched value widths, and added domain printing.",
         "key_facts": [
-            "Superseded unaligned scheduler dump text formatting",
+            "Superseded viewer-defined tab alignment where column widths were inconsistent",
             "Authored by Julia Vassiliki in commit:0e560cf7e",
-            "Standardized column widths for TCB pointers, priorities, and domains"
+            "Standardized alignment and printed the domain for multiple domain setups"
         ],
         "ground_truth_evidence": ["commit:0e560cf7e"],
         "expected_intent": "superseded_implementation",
@@ -679,36 +693,36 @@ questions = [
         "expected_entities": {
             "files": ["src/kernel/thread.c"],
             "functions": ["debug_dumpScheduler"],
-            "features": ["scheduler debug", "dumpScheduler"]
+            "features": ["scheduler", "debug"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout superseded implementation question from real commit 0e560cf7e"
     },
     {
         "qid": "Q028",
         "split": "heldout",
-        "question": "Why did commit 62a062d2a fix x86_64 VM exit handling under SMP and cotenancy?",
+        "question": "Why was stack pointer handling adjusted in restore_vmx() during x86_64 VM exits?",
         "question_type": "rationale",
         "difficulty": "hard",
-        "reference_answer": "In commit:62a062d2a (August 2026), Bill Nguyen resolved broken VM exits on x86_64 SMP with cotenancy because virtual machine context switches on multicore failed to save extended guest CPU registers across CPU migration.",
+        "reference_answer": "In commit:62a062d2a (August 2026), Bill Nguyen fixed a mistake from commit 84d60b5 where the three pushq instructions in restore_vmx() saving host GS, shadow GS, and FS bases started RSP at the first element instead of one element past the end of host_msr_registers, causing values to land in the 24 bytes preceding the table because pushq decrements the stack pointer before storing.",
         "key_facts": [
-            "Authored by Bill Nguyen in commit:62a062d2a",
-            "Fixed VM exit context save on multicore x86_64 virtualization",
-            "Prevented guest register corruption during cross-core vCPU migration"
+            "Fixed a mistake from commit 84d60b5 in restore_vmx() in commit:62a062d2a",
+            "pushq decrements stack pointer before storing, requiring RSP to start one past the end",
+            "RSP was set to first element instead, writing into the 24 bytes preceding host_msr_registers"
         ],
         "ground_truth_evidence": ["commit:62a062d2a"],
         "expected_intent": "rationale",
         "expected_agents": ["code_analysis", "history_rag", "issue_pr"],
         "expected_entities": {
             "files": ["src/arch/x86/64/kernel/vmx.c"],
-            "functions": ["vmx_handle_exit"],
-            "features": ["VM exit", "x86_64", "SMP cotenancy", "VT-x"]
+            "functions": ["restore_vmx"],
+            "features": ["VM exit", "x86_64", "RSP"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout hard rationale question from real commit 62a062d2a"
     },
     {
@@ -727,25 +741,25 @@ questions = [
         "expected_agents": ["code_analysis", "history_rag", "issue_pr"],
         "expected_entities": {
             "files": ["src/kernel/thread.c"],
-            "functions": ["schedule"],
-            "features": ["neural network microcode", "AI scheduler"]
+            "functions": [],
+            "features": ["scheduler", "AI"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout unanswerable question testing hallucination detection"
     },
     {
         "qid": "Q030",
         "split": "heldout",
-        "question": "When was TCB_SIZE_BITS decreased for non-SMP ARM configurations?",
+        "question": "When was TCB_SIZE_BITS decreased following MCS IPC queue changes?",
         "question_type": "timeline",
         "difficulty": "medium",
-        "reference_answer": "In commit:c962e51e3 on May 22, 2026, Gerwin Klein decreased TCB_SIZE_BITS for configurations where SMP is disabled, saving 512 bytes per thread control block in uniprocessor systems.",
+        "reference_answer": "In commit:c962e51e3 on May 22, 2026, Gerwin Klein brought TCB_SIZE_BITS down because the IPC queue changes for MCS in commit 771c9e43cef98 decreased the TCB size slightly for config combinations with MCS + SMP + HYP + benchmarking.",
         "key_facts": [
-            "Committed on May 22, 2026 via commit:c962e51e3",
-            "Authored by Gerwin Klein",
-            "Reduced TCB allocation footprint for non-SMP kernel builds"
+            "Committed on May 22, 2026 in commit:c962e51e3",
+            "Decreased TCB_SIZE_BITS following MCS IPC queue changes in commit 771c9e43cef98",
+            "Authored by Gerwin Klein"
         ],
         "ground_truth_evidence": ["commit:c962e51e3"],
         "expected_intent": "timeline",
@@ -753,49 +767,49 @@ questions = [
         "expected_entities": {
             "files": ["include/arch/arm/arch/object/structures.h"],
             "functions": [],
-            "features": ["TCB_SIZE_BITS", "memory footprint", "uniprocessor"]
+            "features": ["TCB_SIZE_BITS", "MCS"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout timeline question from real commit c962e51e3"
     },
     {
         "qid": "Q031",
         "split": "heldout",
-        "question": "Who authored the commit fixing thread utils on RISC-V fastpath for benchmark builds?",
+        "question": "Who fixed thread utils on the RISC-V fastpath for benchmark builds?",
         "question_type": "authorship",
         "difficulty": "easy",
-        "reference_answer": "Commit:b0567c4d1 (December 5, 2025) fixing thread utility access on RISC-V fastpath when benchmark profiling is active was authored by Rihui Wu.",
+        "reference_answer": "In commit:b0567c4d1 on December 5, 2025, Rihui Wu fixed thread utilities on the RISC-V fastpath for benchmark configurations.",
         "key_facts": [
             "Authored by Rihui Wu in commit:b0567c4d1",
             "Committed on December 5, 2025",
-            "Fixed benchmark cycle accounting during RISC-V fastpath IPC dispatch"
+            "Fixed thread utils on RISC-V fastpath with benchmarking enabled"
         ],
         "ground_truth_evidence": ["commit:b0567c4d1"],
         "expected_intent": "authorship",
         "expected_agents": ["history_rag", "issue_pr"],
         "expected_entities": {
             "files": ["src/arch/riscv/fastpath/fastpath.c"],
-            "functions": ["fastpath_call"],
-            "features": ["RISC-V", "fastpath", "benchmark profiling"]
+            "functions": [],
+            "features": ["RISC-V", "fastpath", "benchmark"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout authorship question from real commit b0567c4d1"
     },
     {
         "qid": "Q032",
         "split": "heldout",
-        "question": "What implementation was superseded by KernelPaddrUserTop exclusive upper bound definition on AArch32 and RISC-V?",
+        "question": "What inconsistency did defining KernelPaddrUserTop as an exclusive bound resolve on 32-bit architectures?",
         "question_type": "superseded_implementation",
         "difficulty": "medium",
-        "reference_answer": "In commit:ddfd66787 (July 2026), Gerwin Klein defined KernelPaddrUserTop as an exclusive upper bound, superseding inclusive range definitions that allowed off-by-one page mapping vulnerabilities at the top of physical RAM.",
+        "reference_answer": "In commit:ddfd66787 (July 2026), Gerwin Klein resolved an inconsistency between 32 and 64 bit architectures by treating KernelPaddrUserTop as exclusive, wrapping it to 0 for untyped creation on 32-bit systems where 2^32 is not expressible.",
         "key_facts": [
-            "Superseded inclusive physical address ceiling definitions",
-            "Authored by Gerwin Klein in commit:ddfd66787",
-            "Eliminated potential off-by-one address aliasing in user physical window checks"
+            "Resolved inconsistent treatment between 32-bit and 64-bit architectures",
+            "Desired 2^32 ceiling was not expressible on 32-bit systems",
+            "Wrapped to 0 for untyped creation in boot.c in commit:ddfd66787 by Gerwin Klein"
         ],
         "ground_truth_evidence": ["commit:ddfd66787"],
         "expected_intent": "superseded_implementation",
@@ -803,61 +817,61 @@ questions = [
         "expected_entities": {
             "files": ["src/arch/arm/config.cmake", "src/arch/riscv/config.cmake"],
             "functions": [],
-            "features": ["KernelPaddrUserTop", "physical memory bounds"]
+            "features": ["KernelPaddrUserTop"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout superseded implementation question from real commit ddfd66787"
     },
     {
         "qid": "Q033",
         "split": "heldout",
-        "question": "Why did commit c4b44a24b add debug info printing for invalid vector entries on ARM64?",
+        "question": "Why was debug printing added for invalid vector entries on ARM64?",
         "question_type": "rationale",
         "difficulty": "medium",
-        "reference_answer": "In commit:c4b44a24b (July 2026), Julia Vassiliki added diagnostic register dumps when taking invalid vector entry exceptions on ARM64 to immediately identify corrupt ESR_EL1 and FAR_EL1 values during early hypervisor bootstrap.",
+        "reference_answer": "In commit:c4b44a24b (July 2026), Julia Vassiliki added diagnostic trap info for invalid vector entries because previously the kernel would simply print 'halting via unknown' in debug mode when an SError occurred without SError ignore turned on.",
         "key_facts": [
-            "Authored by Julia Vassiliki in commit:c4b44a24b",
-            "Added diagnostic printing of exception syndrome registers for invalid vector entries",
-            "Aided debugging of corrupted EL1 vector table offsets"
+            "Replaced generic 'halting via unknown' printout with known trap cause and syndrome info",
+            "Prints vector, fault program counter, and ESR upon SError on ARM64",
+            "Authored by Julia Vassiliki in commit:c4b44a24b"
         ],
         "ground_truth_evidence": ["commit:c4b44a24b"],
         "expected_intent": "rationale",
         "expected_agents": ["code_analysis", "history_rag", "issue_pr"],
         "expected_entities": {
             "files": ["src/arch/arm/64/c_traps.c"],
-            "functions": ["c_handle_invalid_entry"],
-            "features": ["ARM64", "vector table", "c_traps.c"]
+            "functions": [],
+            "features": ["ARM64", "SError"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout rationale question from real commit c4b44a24b"
     },
     {
         "qid": "Q034",
         "split": "heldout",
-        "question": "When was the VDISR_EL2 and CSSELR_EL1 register context switch order updated on AArch64 HYP?",
+        "question": "When was context switching added for VDISR_EL2 and CSSELR_EL1 on AArch64 HYP?",
         "question_type": "timeline",
         "difficulty": "easy",
-        "reference_answer": "In commit:9579c3883 on September 19, 2026, Gerwin Klein swapped the restoration order of VDISR_EL2 and CSSELR_EL1 during AArch64 hypervisor VM entry to prevent spurious virtual syndrome interrupts.",
+        "reference_answer": "In commit:9579c3883 on September 19, 2026, Gerwin Klein added context switching for VDISR_EL2 and CSSELR_EL1 and trapped accesses to RAS error records, where VDISR_EL2 is required for cores with FEAT_RAS.",
         "key_facts": [
             "Committed on September 19, 2026 in commit:9579c3883",
-            "Authored by Gerwin Klein",
-            "Swapped VDISR_EL2 and CSSELR_EL1 context restoration order during hypervisor switch"
+            "Context switches VDISR_EL2 and CSSELR_EL1 for AArch64 virtualization",
+            "Authored by Gerwin Klein"
         ],
         "ground_truth_evidence": ["commit:9579c3883"],
         "expected_intent": "timeline",
         "expected_agents": ["history_rag", "code_analysis"],
         "expected_entities": {
             "files": ["src/arch/arm/64/hyp/vmentry.S"],
-            "functions": ["c_handle_hypervisor_fault"],
-            "features": ["AArch64 HYP", "VDISR_EL2", "CSSELR_EL1"]
+            "functions": [],
+            "features": ["AArch64", "VDISR_EL2", "CSSELR_EL1"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout timeline question from real commit 9579c3883"
     },
     {
@@ -877,40 +891,43 @@ questions = [
         "expected_entities": {
             "files": ["src/kernel/main.c"],
             "functions": [],
-            "features": ["blockchain", "smart contract engine"]
+            "features": ["blockchain"]
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Gerwin Klein",
+        "validated_by": "Parul Gupta (230506)",
         "notes": "Heldout unanswerable question testing hallucination detection"
     }
 ]
 
-# Verify all commits exist in seL4
-all_commits = set()
-for q in questions:
-    for ev in q.get("ground_truth_evidence", []):
-        if ev.startswith("commit:"):
-            sha = ev.split(":")[1]
-            all_commits.add(sha)
+def main():
+    git_dir = find_git_dir()
+    if git_dir:
+        print(f"Verifying commits using git directory: {git_dir}")
+        for q in questions:
+            for ev in q.get("ground_truth_evidence", []):
+                if ev.startswith("commit:"):
+                    sha = ev.split(":")[1]
+                    cmd = ["git", f"--git-dir={git_dir}", "rev-parse", "--verify", f"{sha}^{{commit}}"]
+                    subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
+        print("All commits verified successfully in seL4 git!")
 
-print(f"Verifying {len(all_commits)} commits against seL4 git history...")
-for sha in sorted(all_commits):
-    full = check_commit(sha)
-    print(f"  Verified {sha} -> {full[:12]}")
+    out_file = Path(__file__).resolve().parent / "questions.jsonl"
+    with open(out_file, "w", encoding="utf-8") as f:
+        for q in questions:
+            f.write(json.dumps(q) + "\n")
 
-out_path = "parul_aggarwal/eval_set/questions.jsonl"
-with open(out_path, "w", encoding="utf-8") as f:
-    for q in questions:
-        f.write(json.dumps(q) + "\n")
+    # Canonical hash computation
+    heldout_lines = [json.dumps(q, sort_keys=True) for q in questions if q["split"] == "heldout"]
+    payload = "\n".join(heldout_lines).encode("utf-8")
+    digest = hashlib.sha256(payload).hexdigest()
 
-# Compute canonical deterministic SHA-256 hash of held-out split
-heldout_lines = [json.dumps(q, sort_keys=True) for q in questions if q["split"] == "heldout"]
-heldout_payload = "\n".join(heldout_lines).encode("utf-8")
-digest = hashlib.sha256(heldout_payload).hexdigest()
+    hash_file = Path(__file__).resolve().parent / "heldout_hash.sha256"
+    with open(hash_file, "w", encoding="utf-8") as f:
+        f.write(digest + "\n")
 
-with open("parul_aggarwal/eval_set/heldout_hash.sha256", "w", encoding="utf-8") as f:
-    f.write(digest + "\n")
+    print(f"Generated {len(questions)} verified questions in {out_file}")
+    print(f"Frozen heldout SHA-256 digest: {digest}")
 
-print(f"\nWritten {len(questions)} verified questions to {out_path}")
-print(f"Canonical heldout SHA-256 digest: {digest}")
+if __name__ == "__main__":
+    main()

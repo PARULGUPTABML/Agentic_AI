@@ -154,6 +154,52 @@ class TestOrchestratorAgent:
         accuracy = correct / len(dev_records)
         assert accuracy >= 0.85, f"Dev intent accuracy was {accuracy:.2f}, expected >= 0.85"
 
+    def test_entity_extraction_does_not_invent_stop_words(self, agent):
+        """Verify 'When' is not extracted as a function, and 'Physical'/'Extension' not extracted for PAE."""
+        q1 = "When was SMP lock.c moved from the x86 architecture directory to the generic smp directory?"
+        e1 = agent.extract_entities_heuristic(q1)
+        assert "lock.c" in e1.files
+        assert "SMP" in e1.features
+        assert "When" not in e1.functions
+        assert "when" not in [f.lower() for f in e1.functions]
+        assert "When" not in e1.features
+
+        q2 = "Why was PAE (Physical Address Extension) support removed from x86 in seL4?"
+        e2 = agent.extract_entities_heuristic(q2)
+        assert "PAE" in e2.features
+        assert "Physical" not in e2.features
+        assert "Extension" not in e2.features
+        assert "Physical" not in e2.functions
+        assert "Extension" not in e2.functions
+
+    def test_llm_parse_error_triggers_retry(self):
+        """Verify that a JSON parse error on attempt 1 retries with LLM rather than immediately falling back."""
+        call_count = 0
+        valid_plan_json = json.dumps({
+            "run_id": "test-retry",
+            "round": 1,
+            "intent": "rationale",
+            "entities": {"files": ["vspace_pae.c"], "functions": [], "features": ["PAE"]},
+            "subtasks": [
+                {"id": "t1", "assigned_agent": "history_rag", "sub_query": "Find PAE removal commit", "reason": "Examine commit"}
+            ],
+            "parallel": True,
+            "needs_clarification": False
+        })
+
+        def mock_llm(system: str, prompt: str) -> str:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return "{invalid_json_missing_quotes"
+            return valid_plan_json
+
+        agent = OrchestratorAgent(llm_fn=mock_llm)
+        plan = agent.plan("Why was PAE removed?", run_id="test-retry")
+        assert call_count == 2, f"Expected 2 LLM calls (1 initial + 1 retry), got {call_count}"
+        assert plan.intent == "rationale"
+        assert plan.subtasks[0].assigned_agent == "history_rag"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

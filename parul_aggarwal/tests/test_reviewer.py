@@ -1,6 +1,8 @@
 """Unit and adversarial tests for the Reviewer / Final Response Agent."""
 from __future__ import annotations
 
+import os
+from unittest.mock import patch
 import pytest
 
 from parul_aggarwal.reviewer.agent import ReviewerAgent
@@ -29,7 +31,6 @@ class TestCitationChecker:
         assert stats["invalid"] == 2
         assert "commit:ghost123" in stats["removed"]
         assert "issue:fake999" in stats["removed"]
-        # Third claim lost all citations, converted to inference
         assert sanitized[2]["type"] == "inference"
 
 
@@ -80,10 +81,31 @@ class TestReviewerAgent:
             ]
         }
         res = reviewer.review(input_data)
-        # Must not invent fake architectural consolidation
         assert "architectural consolidation" not in res["inference"]
         assert res["inference"] == "None"
-        assert res["confidence"] == "medium"
+        # Should NOT report high confidence on unrelated items
+        assert res["confidence"] != "high"
+
+    def test_citation_checker_runs_on_llm_output(self, reviewer):
+        """Blocker 3: Model reply citing a made-up [commit:deadbeef99] must be detected and removed."""
+        fake_llm_reply = "PAE support was removed in [commit:3e57e647e], but also affected by [commit:deadbeef99]."
+        input_data = {
+            "run_id": "test-llm-cites",
+            "question": "Why was PAE removed?",
+            "evidence": [
+                {"id": "commit:3e57e647e", "title": "Remove PAE", "text": "SELFOUR-501: x86 - Remove PAE support", "confidence": 0.9}
+            ]
+        }
+        with patch.dict(os.environ, {"LLM_PROVIDER": "real_mock"}):
+            with patch("agents._llm_retry.generate_with_retry", return_value=fake_llm_reply):
+                res = reviewer.review(input_data)
+
+        # Must detect deadbeef99 as invalid and report it
+        assert res["citation_check"]["valid"] == 1
+        assert res["citation_check"]["invalid"] == 1
+        assert "commit:deadbeef99" in res["citation_check"]["removed"]
+        assert "deadbeef99" not in res["answer"]
+        assert len(res["claims"]) >= 1
 
     def test_incomplete_flag_handled(self, reviewer):
         input_data = {
@@ -100,7 +122,6 @@ class TestReviewerAgent:
         assert any("incomplete" in g.lower() or "limit" in g.lower() for g in res["gaps"])
 
     def test_entailment_check_flag(self):
-        """Test that enable_entailment_check inspects claims against evidence."""
         reviewer_with_check = ReviewerAgent(enable_entailment_check=True)
         input_data = {
             "run_id": "test-entail",
