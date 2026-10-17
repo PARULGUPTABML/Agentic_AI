@@ -222,11 +222,17 @@ class ReviewerAgent:
         # 5. Programmatic Citation Checker (runs on LLM and rule-based outputs!)
         sanitized_claims, citation_stats = check_citations(claims, valid_evidence_ids)
 
-        # Strip invalid citations from answer_text
-        for removed_id in citation_stats.get("removed", []):
-            answer_text = re.sub(rf"\[\s*{re.escape(removed_id)}\s*\]", "", answer_text)
-            answer_text = re.sub(rf",\s*{re.escape(removed_id)}", "", answer_text)
-            answer_text = re.sub(rf"{re.escape(removed_id)}\s*,", "", answer_text)
+        # Strip invalid citations and cleanup punctuation in answer_text
+        from parul_aggarwal.reviewer.citation_checker import sanitize_text_artifacts
+
+        evidence_claims = [c for c in sanitized_claims if c.get("type") == "evidence"]
+        if evidence_claims and any(c.get("type") == "inference" for c in sanitized_claims):
+            # Keep only verified evidence statements in the direct answer paragraph
+            answer_text = " ".join([c["text"] for c in evidence_claims])
+        else:
+            answer_text = sanitize_text_artifacts(answer_text, citation_stats.get("removed", []))
+
+        answer_text = sanitize_text_artifacts(answer_text, citation_stats.get("removed", []))
 
         # 6. Gaps & Confidence
         gaps = list(gap_notes)

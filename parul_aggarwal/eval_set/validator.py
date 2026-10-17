@@ -37,7 +37,7 @@ REQUIRED_FIELDS = {
 }
 
 ALLOWED_SPLITS = {"dev", "heldout"}
-ALLOWED_QUESTION_TYPES = {"rationale", "timeline", "authorship", "superseded_implementation", "factual", "historical", "architectural", "negative"}
+ALLOWED_QUESTION_TYPES = {"rationale", "timeline", "authorship", "superseded_implementation"}
 ALLOWED_DIFFICULTIES = {"easy", "medium", "hard"}
 ALLOWED_INTENTS = {"rationale", "timeline", "authorship", "superseded_implementation", "other"}
 ALLOWED_AGENTS = {"code_analysis", "history_rag", "issue_pr"}

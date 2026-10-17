@@ -24,6 +24,21 @@ def extract_citations(text: str) -> List[str]:
     return found
 
 
+def sanitize_text_artifacts(text: str, removed_ids: List[str]) -> str:
+    """Strip removed citation tags and cleanup stray punctuation or hanging clauses."""
+    for rid in removed_ids:
+        text = re.sub(rf"\[\s*{re.escape(rid)}\s*\]", "", text)
+        text = re.sub(rf"{re.escape(rid)}", "", text)
+    # Remove hanging prepositions and conjunctions before end of sentence
+    text = re.sub(r",?\s*(?:but|and|or)(?:\s+also)?\s*\.", ".", text, flags=re.I)
+    text = re.sub(r"(?:by|at|in|for|from|with|affected\s+by)\s*\.", ".", text, flags=re.I)
+    text = re.sub(r",\s*,+", ",", text)
+    text = re.sub(r",\s*\.", ".", text)
+    text = re.sub(r"\s+([.,;:!?])", r"", text)
+    text = re.sub(r"\s{2,}", " ", text)
+    return text.strip()
+
+
 def check_citations(
     claims: List[Dict[str, Any]],
     valid_evidence_ids: Set[str]
@@ -51,6 +66,15 @@ def check_citations(
 
         clean_claim = dict(claim)
         clean_claim["citations"] = verified_citations
+
+        # Strip invalid citations from the claim text itself
+        text = clean_claim.get("text", "")
+        if claim.get("citations"):
+            invalid_in_claim = [c for c in claim.get("citations", []) if c not in valid_evidence_ids]
+            if invalid_in_claim:
+                text = sanitize_text_artifacts(text, invalid_in_claim)
+        clean_claim["text"] = text
+
         # If all citations were invalid for an evidence-type claim, convert to inference
         if claim.get("type") == "evidence" and not verified_citations:
             clean_claim["type"] = "inference"

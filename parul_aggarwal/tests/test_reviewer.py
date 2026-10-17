@@ -161,6 +161,38 @@ class TestReviewerAgent:
         logs = bb.get_logs()
         assert any(l.agent == "reviewer" for l in logs)
 
+    def test_reviewer_polish_no_stray_dot_and_no_duplicate_citations(self):
+        """Verify reviewer polish: unsupported sentences dropped from Answer, fake IDs stripped from Inference, citations not repeated."""
+        fake_llm_reply = "PAE support was removed in [commit:3e57e647e]. It also changed the scheduler [commit:deadbeef99]."
+        reviewer = ReviewerAgent(llm_fn=lambda s, p: fake_llm_reply)
+        input_data = {
+            "run_id": "test-polish",
+            "question": "Why was PAE removed?",
+            "evidence": [
+                {"id": "commit:3e57e647e", "title": "Remove PAE", "text": "SELFOUR-501: x86 - Remove PAE support", "confidence": 0.9}
+            ]
+        }
+        res = reviewer.review(input_data)
+
+        # Answer should only contain supported claim, without stray dot or fake ID
+        assert "PAE support was removed in [commit:3e57e647e]." in res["answer"]
+        assert "deadbeef99" not in res["answer"]
+        assert " ." not in res["answer"]
+        assert "scheduler" not in res["answer"]
+
+        # Rendered output checks
+        rendered = res["rendered"]
+        assert "deadbeef99" not in rendered
+        # Supporting evidence should cite commit:3e57e647e exactly once per line, not twice
+        sup_lines = [l for l in rendered.splitlines() if "- PAE support" in l]
+        assert len(sup_lines) == 1
+        assert sup_lines[0].count("commit:3e57e647e") == 1
+
+        # Inference should contain the sanitized unsupported claim without fake ID
+        inf_lines = [l for l in rendered.splitlines() if "scheduler" in l.lower()]
+        assert len(inf_lines) == 1
+        assert "deadbeef99" not in inf_lines[0]
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

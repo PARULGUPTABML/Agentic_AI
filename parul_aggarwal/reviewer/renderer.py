@@ -21,8 +21,14 @@ def render_template(
     evidence_claims = [c for c in claims if c.get("type") == "evidence"]
     if evidence_claims:
         for c in evidence_claims:
-            cites = ", ".join(c.get("citations", []))
-            lines.append(f"- {c['text']} [{cites}]")
+            text = c['text'].strip()
+            cites = [cid for cid in c.get("citations", []) if cid]
+            # Prevent duplicate citation appending if citation tag already exists in text
+            all_present = all(f"[{cid}]" in text or cid in text for cid in cites)
+            if all_present or not cites:
+                lines.append(f"- {text}")
+            else:
+                lines.append(f"- {text} [{', '.join(cites)}]")
     else:
         lines.append("- No direct factual evidence available in corpus.")
     lines.append("")
@@ -46,4 +52,4 @@ def render_template(
     else:
         lines.append("- Not found in evidence: none")
 
-    return "\n".join(lines)
+    return chr(10).join(lines)

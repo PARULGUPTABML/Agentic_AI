@@ -32,9 +32,9 @@ PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "orchestrator
 
 INTENT_PATTERNS = [
     ("superseded_implementation", re.compile(r"\b(supersede|superseded|superseding|replace|replaced|deprecated|predecessor|prior\s+to|what\s+did\b.+\bsupersede)\b", re.IGNORECASE)),
-    ("rationale", re.compile(r"\b(why|reason|motivation|purpose|rationale)\b", re.IGNORECASE)),
-    ("timeline", re.compile(r"\b(when|timeline|date|year|sequence|introduced|merged|migrated)\b", re.IGNORECASE)),
     ("authorship", re.compile(r"\b(who|author|authored|spearheaded|created\s+by|approved\s+by|reviewed\s+by)\b", re.IGNORECASE)),
+    ("timeline", re.compile(r"\b(when|timeline|date|year|sequence|introduced|merged|migrated)\b", re.IGNORECASE)),
+    ("rationale", re.compile(r"\b(why|reason|motivation|purpose|rationale)\b", re.IGNORECASE)),
 ]
 
 STOP_WORDS = {

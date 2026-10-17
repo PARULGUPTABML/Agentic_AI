@@ -26,7 +26,7 @@ questions = [
     {
         "qid": "Q001",
         "split": "dev",
-        "question": "What changes were made to remove PAE support on x86 32-bit under SELFOUR-501?",
+        "question": "Why was PAE (Physical Address Extension) support removed from x86 32-bit under SELFOUR-501?",
         "question_type": "rationale",
         "difficulty": "medium",
         "reference_answer": "In commit:3e57e647e (merged via PR:420, tracked under issue:SELFOUR-501), PAE (Physical Address Extension) support was removed from x86 32-bit by deleting src/arch/x86/32/kernel/vspace_pae.c and removing PAE structures from structures.bf and head.S.",
@@ -45,7 +45,7 @@ questions = [
         },
         "needs_multiple_sources": True,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Dev rationale question grounded in real seL4 commit 3e57e647e"
     },
     {
@@ -70,7 +70,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Dev timeline question grounded in real seL4 commit 904a13ac1"
     },
     {
@@ -95,7 +95,7 @@ questions = [
         },
         "needs_multiple_sources": True,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Dev authorship question grounded in real seL4 commit f0594ac91"
     },
     {
@@ -120,7 +120,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Dev superseded implementation question grounded in real commit 03ad568c8"
     },
     {
@@ -145,13 +145,13 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Dev hard rationale question grounded in real commit 771c9e43c"
     },
     {
         "qid": "Q006",
         "split": "dev",
-        "question": "When was Cortex-A15 errata checking moved to C code and merged via PR #5?",
+        "question": "When was Cortex-A15 hardware errata checking relocated to C code on ARM platforms?",
         "question_type": "timeline",
         "difficulty": "medium",
         "reference_answer": "In commit:43e1a215b and PR merge commit:99b2b2562 (July 18, 2014, PR #5), Adrian Danis merged a workaround for hardware errata on Cortex-A15 boards and relocated errata checking into C code.",
@@ -170,7 +170,7 @@ questions = [
         },
         "needs_multiple_sources": True,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Dev timeline question grounded in real seL4 PR 5 and commit 43e1a215b"
     },
     {
@@ -194,7 +194,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Dev unanswerable diagnostic question testing hallucination detection"
     },
 
@@ -221,7 +221,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout rationale question from real commit 28b8f4c40"
     },
     {
@@ -246,7 +246,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout timeline question from real commit ecec5e4af"
     },
     {
@@ -271,16 +271,16 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout authorship question from real commit fc9bd2a41"
     },
     {
         "qid": "Q011",
         "split": "heldout",
-        "question": "What race condition was resolved by moving pc99 CMake configurations to the x86 directory?",
+        "question": "What configuration layout was superseded by moving pc99 CMake configurations to the x86 directory?",
         "question_type": "superseded_implementation",
         "difficulty": "medium",
-        "reference_answer": "In commit:b0f974c4a (September 2019), Kent McLeod moved pc99 configs to the x86 directory to fix a configuration race condition where projects try to set KernelIOMMU after platform settings are configured, resulting in KernelIOMMU having an incorrect value.",
+        "reference_answer": "In commit:b0f974c4a (September 2019), Kent McLeod moved pc99 configs to the x86 directory, superseding the previous layout to resolve a configuration race condition where projects set KernelIOMMU after platform settings were configured, leading to incorrect values.",
         "key_facts": [
             "Fixed configuration race condition where KernelIOMMU was set after platform settings",
             "Moved pc99 configs to the x86 directory in commit:b0f974c4a",
@@ -296,7 +296,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout superseded implementation question from real commit b0f974c4a"
     },
     {
@@ -307,9 +307,9 @@ questions = [
         "difficulty": "medium",
         "reference_answer": "In commit:8b8969a23 (September 2026), Gerwin Klein reserved hardware ASID 0 for the empty page directory so that an unmapped page directory does not allocate or conflict with active user hardware ASIDs.",
         "key_facts": [
-            "Reserved hardware ASID 0 for empty page directory in commit:8b8969a23",
-            "Authored by Gerwin Klein on AArch32 vspace",
-            "Prevented unmapped page directory from colliding with active user thread ASID spaces"
+            "Authored by Gerwin Klein in commit:8b8969a23",
+            "Previously empty/global PD used the currently running hw ASID/VMID, leading to stale TLB mappings being available in nominally empty address space",
+            "Reserved hardware ASID 0 specifically for empty/global PD and introduced setGlobalPD()"
         ],
         "ground_truth_evidence": ["commit:8b8969a23"],
         "expected_intent": "rationale",
@@ -321,7 +321,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout rationale question from real commit 8b8969a23"
     },
     {
@@ -346,7 +346,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout timeline question from real commit 6e9370a56"
     },
     {
@@ -371,7 +371,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout authorship question from real commit 357c6003d"
     },
     {
@@ -396,7 +396,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout superseded implementation question from real commit 18db53023"
     },
     {
@@ -421,7 +421,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout rationale question from real commit 6df0b6ee6"
     },
     {
@@ -447,20 +447,20 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout rationale question from real commit f963b22f7"
     },
     {
         "qid": "Q018",
         "split": "heldout",
-        "question": "Who corrected the x86 VCPU object creation sizing in seL4?",
+        "question": "Which author corrected the VCPU object creation capability handling on x86?",
         "question_type": "authorship",
         "difficulty": "easy",
-        "reference_answer": "In commit:57a909f61 (December 11, 2024), Mathieu Mirmont fixed x86 VCPU object creation by correcting the object size definition in include/arch/x86/arch/object/structures.h.",
+        "reference_answer": "In commit:57a909f61 (December 11, 2024), Mathieu Mirmont fixed x86 VCPU object creation by marking VCPU capabilities as physical objects in cap_get_archCapIsPhysical() and implementing cap_get_archCapPtr(), because VCPU objects are physical objects that use memory areas allocated from Untyped memory.",
         "key_facts": [
             "Authored by Mathieu Mirmont in commit:57a909f61",
-            "Fixed VCPU object creation size definition in structures.h",
-            "Committed on December 11, 2024"
+            "Marked VCPU objects as physical objects in cap_get_archCapIsPhysical()",
+            "VCPU objects use memory areas allocated from Untyped memory"
         ],
         "ground_truth_evidence": ["commit:57a909f61"],
         "expected_intent": "authorship",
@@ -472,7 +472,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout authorship question from real commit 57a909f61"
     },
     {
@@ -497,7 +497,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout superseded implementation question from real commit a7b88f937"
     },
     {
@@ -506,11 +506,11 @@ questions = [
         "question": "Why was the compile-time assertion for root CNode size adjusted in boot code?",
         "question_type": "rationale",
         "difficulty": "medium",
-        "reference_answer": "In commit:ed5e7c8e5 (April 2024), Craig McLaughlin fixed the compile-time assertion for root CNode size in src/kernel/boot.c to ensure it correctly evaluates the required size bounds.",
+        "reference_answer": "In commit:ed5e7c8e5 (April 2024), Craig McLaughlin fixed the compile-time assertion in src/kernel/boot.c because the check compared BIT(CONFIG_ROOT_CNODE_SIZE_BITS) instead of CONFIG_ROOT_CNODE_SIZE_BITS against (seL4_PageBits - seL4_SlotBits), which failed to enforce the minimum radix intended by commit 5fac9e8 and still allowed an invalid radix of 4 to be specified.",
         "key_facts": [
-            "Fixed root CNode size compile-time assert in src/kernel/boot.c",
             "Authored by Craig McLaughlin in commit:ed5e7c8e5",
-            "Committed on April 5, 2024"
+            "Assertion failed to enforce the minimum radix intended by commit 5fac9e8",
+            "Incorrectly allowed a radix of 4 to be specified due to comparing BIT(CONFIG_ROOT_CNODE_SIZE_BITS) instead of the raw radix bits"
         ],
         "ground_truth_evidence": ["commit:ed5e7c8e5"],
         "expected_intent": "rationale",
@@ -522,19 +522,19 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout rationale question from real commit ed5e7c8e5"
     },
     {
         "qid": "Q021",
         "split": "heldout",
-        "question": "What copy/paste error in the x86 fastpath slowpath fallback was fixed in commit 859465e6a?",
+        "question": "What incorrect slowpath bailout was superseded by fixing the fastpath copy/paste error in reply-receive IPC?",
         "question_type": "superseded_implementation",
         "difficulty": "easy",
-        "reference_answer": "In commit:859465e6a (October 14, 2026), Gerwin Klein fixed a copy/paste error introduced in a4f893b9 where fastpath_reply_recv incorrectly bailed out to slowpath(SysCall) instead of slowpath(SysReplyRecv).",
+        "reference_answer": "In commit:859465e6a (October 14, 2026), Gerwin Klein fixed a copy/paste error introduced in a4f893b9 where fastpath_reply_recv incorrectly bailed out to slowpath(SysCall), superseding the erroneous SysCall bailout with slowpath(SysReplyRecv).",
         "key_facts": [
             "Fixed a copy/paste error introduced in commit a4f893b9",
-            "fastpath_reply_recv should bail out to slowpath(SysReplyRecv), not slowpath(SysCall)",
+            "Superseded incorrect bailout to slowpath(SysCall) with slowpath(SysReplyRecv)",
             "Authored by Gerwin Klein in commit:859465e6a on October 14, 2026"
         ],
         "ground_truth_evidence": ["commit:859465e6a"],
@@ -547,7 +547,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout superseded implementation question from real commit 859465e6a"
     },
     {
@@ -572,7 +572,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout authorship question from real commit b57b3de19"
     },
     {
@@ -597,7 +597,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout superseded implementation question from real commit 0a72b4cfc"
     },
     {
@@ -622,7 +622,7 @@ questions = [
         },
         "needs_multiple_sources": True,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout hard rationale question from real commit e912dff73"
     },
     {
@@ -647,7 +647,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout timeline question from real commit c6ce4d2a0"
     },
     {
@@ -672,7 +672,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout authorship question from real commit 11c5d5052"
     },
     {
@@ -697,7 +697,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout superseded implementation question from real commit 0e560cf7e"
     },
     {
@@ -722,7 +722,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout hard rationale question from real commit 62a062d2a"
     },
     {
@@ -746,7 +746,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout unanswerable question testing hallucination detection"
     },
     {
@@ -771,7 +771,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout timeline question from real commit c962e51e3"
     },
     {
@@ -796,20 +796,20 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout authorship question from real commit b0567c4d1"
     },
     {
         "qid": "Q032",
         "split": "heldout",
-        "question": "What inconsistency did defining KernelPaddrUserTop as an exclusive bound resolve on 32-bit architectures?",
+        "question": "What inclusive bound behavior was superseded by defining KernelPaddrUserTop as an exclusive bound on 32-bit architectures?",
         "question_type": "superseded_implementation",
         "difficulty": "medium",
-        "reference_answer": "In commit:ddfd66787 (July 2026), Gerwin Klein resolved an inconsistency between 32 and 64 bit architectures by treating KernelPaddrUserTop as exclusive, wrapping it to 0 for untyped creation on 32-bit systems where 2^32 is not expressible.",
+        "reference_answer": "In commit:ddfd66787 (July 2026), Gerwin Klein treated KernelPaddrUserTop as an exclusive bound, superseding an inconsistent inclusive bound treatment across 32 and 64 bit architectures by safely wrapping to 0 for untyped creation on 32-bit systems where 2^32 is not expressible.",
         "key_facts": [
-            "Resolved inconsistent treatment between 32-bit and 64-bit architectures",
-            "Desired 2^32 ceiling was not expressible on 32-bit systems",
-            "Wrapped to 0 for untyped creation in boot.c in commit:ddfd66787 by Gerwin Klein"
+            "Authored by Gerwin Klein in commit:ddfd66787",
+            "Superseded inconsistent inclusive bound treatment across 32 and 64 bit architectures",
+            "Safely wrapped to 0 for untyped creation on 32-bit architectures"
         ],
         "ground_truth_evidence": ["commit:ddfd66787"],
         "expected_intent": "superseded_implementation",
@@ -821,7 +821,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout superseded implementation question from real commit ddfd66787"
     },
     {
@@ -846,7 +846,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout rationale question from real commit c4b44a24b"
     },
     {
@@ -871,7 +871,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout timeline question from real commit 9579c3883"
     },
     {
@@ -895,7 +895,7 @@ questions = [
         },
         "needs_multiple_sources": False,
         "annotator": "Parul Aggarwal (230540)",
-        "validated_by": "Parul Gupta (230506)",
+        "validated_by": "Parul Aggarwal (230540)",
         "notes": "Heldout unanswerable question testing hallucination detection"
     }
 ]
