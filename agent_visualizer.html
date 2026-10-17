@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Agent System — Interactive Visualizer</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideRight { from { width: 0%; } to { width: 100%; } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .animate-fadein { animation: fadeIn 0.4s ease-out forwards; }
+    .step-hidden { opacity: 0; transform: translateY(10px); }
+    .timeline-bar { animation: slideRight 0.6s ease-out forwards; }
+    .pulse-dot { animation: pulse 1.5s infinite; }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+
+    .agent-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-react { background: #1e40af20; color: #3b82f6; border: 1px solid #3b82f620; }
+    .badge-cot { background: #7c3aed20; color: #8b5cf6; border: 1px solid #7c3aed20; }
+    .badge-pipeline { background: #059e6020; color: #10b981; border: 1px solid #059e6020; }
+    .badge-blackboard { background: #d9770620; color: #f59e0b; border: 1px solid #d9770620; }
+
+    .thought-box { border-left: 3px solid #3b82f6; background: #3b82f608; padding: 8px 12px; border-radius: 0 8px 8px 0; }
+    .action-box { border-left: 3px solid #10b981; background: #10b98108; padding: 8px 12px; border-radius: 0 8px 8px 0; }
+    .observe-box { border-left: 3px solid #f59e0b; background: #f59e0b08; padding: 8px 12px; border-radius: 0 8px 8px 0; }
+    .cot-box { border-left: 3px solid #8b5cf6; background: #8b5cf608; padding: 8px 12px; border-radius: 0 8px 8px 0; }
+
+    .tab-btn { cursor: pointer; padding: 8px 16px; border-radius: 8px 8px 0 0; font-weight: 600; font-size: 0.875rem; transition: all 0.2s; }
+    .tab-btn.active { background: var(--card, #1e293b); color: var(--foreground, #f1f5f9); border-bottom: 2px solid #3b82f6; }
+    .tab-btn:not(.active) { background: transparent; color: var(--muted-foreground, #94a3b8); }
+    .tab-btn:not(.active):hover { background: var(--card, #1e293b); opacity: 0.7; }
+  </style>
+</head>
+<body class="bg-[var(--background,#0f172a)] text-[var(--foreground,#f1f5f9)] antialiased min-h-screen p-6">
+
+  <!-- Header -->
+  <div class="max-w-6xl mx-auto mb-6">
+    <div class="flex items-center gap-3 mb-2">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg">🤖</div>
+      <div>
+        <h1 class="text-2xl font-bold">Multi-Agent System — Interactive Visualizer</h1>
+        <p class="text-[var(--muted-foreground,#94a3b8)] text-sm">Parul Gupta — 230506 • Repository-Aware Multi-Agent AI for Software History</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="max-w-6xl mx-auto">
+    <div class="flex gap-1 border-b border-[var(--border,#334155)]">
+      <div class="tab-btn active" onclick="switchTab('react')">🔄 ReAct Loop</div>
+      <div class="tab-btn" onclick="switchTab('cot')">🧠 CoT Verification</div>
+      <div class="tab-btn" onclick="switchTab('blackboard')">📋 Blackboard</div>
+      <div class="tab-btn" onclick="switchTab('protocols')">📡 Protocols</div>
+      <div class="tab-btn" onclick="switchTab('pipeline')">⚡ Full Pipeline</div>
+    </div>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="max-w-6xl mx-auto mt-4">
+
+    <!-- ═══════════ TAB 1: ReAct Loop ═══════════ -->
+    <div id="tab-react" class="tab-content">
+      <div class="bg-[var(--card,#1e293b)] border border-[var(--border,#334155)] rounded-xl p-6 mb-4">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-semibold flex items-center gap-2">
+              <span class="badge-react agent-badge">🔄 History/RAG Agent</span>
+              ReAct Loop — Step by Step
+            </h2>
+            <p class="text-[var(--muted-foreground,#94a3b8)] text-sm mt-1">
+              <strong>Reason → Act → Observe → Repeat</strong> until enough evidence is found (max 5 iterations)
+            </p>
+          </div>
+          <button onclick="playReact()" id="react-play-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors">
+            ▶ Play Animation
+          </button>
+        </div>
+
+        <div class="bg-[var(--background,#0f172a)] rounded-lg p-4 mb-4">
+          <p class="text-sm text-[var(--muted-foreground,#94a3b8)]">❓ Question:</p>
+          <p class="font-semibold">"Why was the authentication mechanism redesigned?"</p>
+          <p class="text-xs text-[var(--muted-foreground,#94a3b8)] mt-1">Repo: seL4/seL4</p>
+        </div>
+
+        <div id="react-steps" class="space-y-4">
+          <!-- Iteration 1 -->
+          <div class="react-step step-hidden" data-step="1">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">Iteration 1</span>
+              <span class="text-xs text-[var(--muted-foreground,#94a3b8)]">search_commits</span>
+            </div>
+            <div class="space-y-2 ml-4">
+              <div class="thought-box">
+                <p class="text-xs font-semibold text-blue-400 mb-1">💭 Thought</p>
+                <p class="text-sm">The question asks WHY auth was redesigned. I should search commit history for auth-related changes first.</p>
+              </div>
+              <div class="action-box">
+                <p class="text-xs font-semibold text-green-400 mb-1">⚡ Action</p>
+                <p class="text-sm font-mono">search_commits("auth redesign security capability")</p>
+              </div>
+              <div class="observe-box">
+                <p class="text-xs font-semibold text-yellow-400 mb-1">👁 Observe</p>
+                <p class="text-sm">Found 3 commits — <span class="text-yellow-300 font-mono text-xs">[commit:a1b2c3d4]</span> Redesign auth to use capability-based security (conf: 0.92)</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Iteration 2 -->
+          <div class="react-step step-hidden" data-step="2">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">Iteration 2</span>
+              <span class="text-xs text-[var(--muted-foreground,#94a3b8)]">search_issues</span>
+            </div>
+            <div class="space-y-2 ml-4">
+              <div class="thought-box">
+                <p class="text-xs font-semibold text-blue-400 mb-1">💭 Thought</p>
+                <p class="text-sm">Found WHAT changed but need to understand WHY. Let me check issues for the security motivation.</p>
+              </div>
+              <div class="action-box">
+                <p class="text-xs font-semibold text-green-400 mb-1">⚡ Action</p>
+                <p class="text-sm font-mono">search_issues("security vulnerability auth replay attack")</p>
+              </div>
+              <div class="observe-box">
+                <p class="text-xs font-semibold text-yellow-400 mb-1">👁 Observe</p>
+                <p class="text-sm">Found 2 issues — <span class="text-yellow-300 font-mono text-xs">[issue:142]</span> Security audit: password auth vulnerable to replay attacks (conf: 0.87)</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Iteration 3 -->
+          <div class="react-step step-hidden" data-step="3">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">Iteration 3</span>
+              <span class="text-xs text-[var(--muted-foreground,#94a3b8)]">get_linked</span>
+            </div>
+            <div class="space-y-2 ml-4">
+              <div class="thought-box">
+                <p class="text-xs font-semibold text-blue-400 mb-1">💭 Thought</p>
+                <p class="text-sm">Issue #142 explains WHY — security audit. Now let me find the PR that implemented the fix for the full picture.</p>
+              </div>
+              <div class="action-box">
+                <p class="text-xs font-semibold text-green-400 mb-1">⚡ Action</p>
+                <p class="text-sm font-mono">get_linked("issue:142")</p>
+              </div>
+              <div class="observe-box">
+                <p class="text-xs font-semibold text-yellow-400 mb-1">👁 Observe</p>
+                <p class="text-sm">Found linked PR — <span class="text-yellow-300 font-mono text-xs">[pr:89]</span> Implement capability-based auth (fixes #142) (conf: 0.85)</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Iteration 4: Finish -->
+          <div class="react-step step-hidden" data-step="4">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="bg-green-600 text-white text-xs font-bold px-2 py-0.5 rounded">Iteration 4 — FINISH</span>
+            </div>
+            <div class="space-y-2 ml-4">
+              <div class="thought-box">
+                <p class="text-xs font-semibold text-blue-400 mb-1">💭 Thought</p>
+                <p class="text-sm">I have commit (WHAT) + issue (WHY) + PR (HOW). Complete picture: security audit → vulnerability → capability redesign. <strong>Finishing.</strong></p>
+              </div>
+              <div class="action-box">
+                <p class="text-xs font-semibold text-green-400 mb-1">✅ Action</p>
+                <p class="text-sm font-mono">finish("Security audit #142 → PR #89 → auth redesign")</p>
+              </div>
+              <div class="observe-box">
+                <p class="text-xs font-semibold text-yellow-400 mb-1">📋 Result</p>
+                <p class="text-sm"><strong>3 evidence pieces</strong> posted to Blackboard (commit + issue + PR)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="react-summary" class="mt-4 p-4 bg-green-900/20 border border-green-700/30 rounded-lg step-hidden">
+          <p class="text-green-400 font-semibold text-sm">✅ ReAct Loop Complete — 4 iterations, 3 evidence pieces collected</p>
+          <p class="text-xs text-[var(--muted-foreground,#94a3b8)] mt-1">The agent autonomously decided which tools to use and when to stop. This is the power of the ReAct pattern!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ TAB 2: CoT Verification ═══════════ -->
+    <div id="tab-cot" class="tab-content hidden">
+      <div class="bg-[var(--card,#1e293b)] border border-[var(--border,#334155)] rounded-xl p-6 mb-4">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-semibold flex items-center gap-2">
+              <span class="badge-cot agent-badge">🧠 Evidence Verification Agent</span>
+              Chain-of-Thought Reasoning
+            </h2>
+            <p class="text-[var(--muted-foreground,#94a3b8)] text-sm mt-1">
+              Checks 5 dimensions: <strong>WHAT · WHY · WHO/WHEN · CONTEXT · COMPLETENESS</strong>
+            </p>
+          </div>
+          <button onclick="playCot()" id="cot-play-btn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors">
+            ▶ Play Animation
+          </button>
+        </div>
+
+        <div class="bg-[var(--background,#0f172a)] rounded-lg p-4 mb-4">
+          <p class="text-sm text-[var(--muted-foreground,#94a3b8)]">📋 Input: 3 evidence pieces from History/RAG Agent</p>
+          <div class="flex gap-2 mt-2 flex-wrap">
+            <span class="text-xs bg-blue-900/40 text-blue-300 px-2 py-1 rounded">commit:a1b2c3d4</span>
+            <span class="text-xs bg-green-900/40 text-green-300 px-2 py-1 rounded">issue:142</span>
+            <span class="text-xs bg-purple-900/40 text-purple-300 px-2 py-1 rounded">pr:89</span>
+          </div>
+        </div>
+
+        <div id="cot-steps" class="space-y-3">
+          <div class="cot-step step-hidden" data-step="1">
+            <div class="cot-box">
+              <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold text-purple-400">Step 1: Check WHAT changed</p>
+                <span id="cot-check-1" class="text-green-400 text-sm hidden">✅</span>
+              </div>
+              <p class="text-sm mt-1">Commit a1b2c3d4 shows auth.c, security.h, tokens.c were modified. Password-based auth replaced with capability tokens. <strong>→ WHAT is covered.</strong></p>
+            </div>
+          </div>
+          <div class="cot-step step-hidden" data-step="2">
+            <div class="cot-box">
+              <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold text-purple-400">Step 2: Check WHY it changed</p>
+                <span id="cot-check-2" class="text-green-400 text-sm hidden">✅</span>
+              </div>
+              <p class="text-sm mt-1">Issue #142 documents the security audit that discovered replay attack vulnerabilities. <strong>→ WHY is covered.</strong></p>
+            </div>
+          </div>
+          <div class="cot-step step-hidden" data-step="3">
+            <div class="cot-box">
+              <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold text-purple-400">Step 3: Check WHO/WHEN</p>
+                <span id="cot-check-3" class="text-green-400 text-sm hidden">✅</span>
+              </div>
+              <p class="text-sm mt-1">Commit by john on 2024-03-15. PR reviewed by alice, bob — merged 2024-03-16. <strong>→ WHO/WHEN is covered.</strong></p>
+            </div>
+          </div>
+          <div class="cot-step step-hidden" data-step="4">
+            <div class="cot-box">
+              <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold text-purple-400">Step 4: Check CONTEXT</p>
+                <span id="cot-check-4" class="text-green-400 text-sm hidden">✅</span>
+              </div>
+              <p class="text-sm mt-1">PR #89 shows the fix was a direct response to the security audit findings. <strong>→ CONTEXT is covered.</strong></p>
+            </div>
+          </div>
+          <div class="cot-step step-hidden" data-step="5">
+            <div class="cot-box">
+              <div class="flex items-center justify-between">
+                <p class="text-xs font-semibold text-purple-400">Step 5: Check COMPLETENESS</p>
+                <span id="cot-check-5" class="text-green-400 text-sm hidden">✅</span>
+              </div>
+              <p class="text-sm mt-1">Have commit + issue + PR — 3 different evidence types showing the complete decision chain. <strong>→ COMPLETE.</strong></p>
+            </div>
+          </div>
+        </div>
+
+        <div id="cot-verdict" class="mt-4 p-4 bg-green-900/20 border border-green-700/30 rounded-lg step-hidden">
+          <div class="flex items-center gap-3">
+            <div class="w-16 h-16 rounded-full bg-green-600/20 border-2 border-green-500 flex items-center justify-center">
+              <span class="text-2xl">✅</span>
+            </div>
+            <div>
+              <p class="text-green-400 font-bold text-lg">VERDICT: SUFFICIENT</p>
+              <p class="text-sm text-[var(--muted-foreground,#94a3b8)]">Confidence: <strong class="text-green-300">0.92</strong> — All 5 dimensions covered</p>
+              <p class="text-xs text-[var(--muted-foreground,#94a3b8)] mt-1">No gaps found. No retry needed.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ TAB 3: Blackboard ═══════════ -->
+    <div id="tab-blackboard" class="tab-content hidden">
+      <div class="bg-[var(--card,#1e293b)] border border-[var(--border,#334155)] rounded-xl p-6">
+        <h2 class="text-lg font-semibold flex items-center gap-2 mb-4">
+          <span class="badge-blackboard agent-badge">📋 Blackboard</span>
+          Shared Evidence Store
+        </h2>
+        <p class="text-[var(--muted-foreground,#94a3b8)] text-sm mb-4">
+          Central knowledge repository where all agents post & read evidence. Thread-safe with observability logging.
+        </p>
+
+        <!-- Blackboard Architecture -->
+        <div class="bg-[var(--background,#0f172a)] rounded-lg p-5 mb-4">
+          <p class="text-center text-sm text-[var(--muted-foreground,#94a3b8)] mb-3">Architecture</p>
+          <div class="flex items-center justify-center gap-4 flex-wrap">
+            <div class="text-center">
+              <div class="w-24 h-20 bg-blue-900/30 border border-blue-700/40 rounded-lg flex flex-col items-center justify-center">
+                <span class="text-xl">🔍</span>
+                <span class="text-xs text-blue-300 mt-1">History/RAG</span>
+                <span class="text-[10px] text-blue-400">(ReAct)</span>
+              </div>
+            </div>
+            <div class="text-2xl text-[var(--muted-foreground,#94a3b8)]">→</div>
+            <div class="text-center">
+              <div class="w-32 h-24 bg-yellow-900/30 border-2 border-yellow-600/50 rounded-lg flex flex-col items-center justify-center shadow-lg shadow-yellow-900/20">
+                <span class="text-2xl">📋</span>
+                <span class="text-sm text-yellow-300 font-bold mt-1">Blackboard</span>
+                <span class="text-[10px] text-yellow-400">Evidence Store</span>
+              </div>
+            </div>
+            <div class="text-2xl text-[var(--muted-foreground,#94a3b8)]">→</div>
+            <div class="text-center">
+              <div class="w-24 h-20 bg-purple-900/30 border border-purple-700/40 rounded-lg flex flex-col items-center justify-center">
+                <span class="text-xl">🧠</span>
+                <span class="text-xs text-purple-300 mt-1">Verification</span>
+                <span class="text-[10px] text-purple-400">(CoT)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Evidence Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-[var(--border,#334155)]">
+                <th class="text-left py-2 px-3 text-[var(--muted-foreground,#94a3b8)] font-medium">ID</th>
+                <th class="text-left py-2 px-3 text-[var(--muted-foreground,#94a3b8)] font-medium">Type</th>
+                <th class="text-left py-2 px-3 text-[var(--muted-foreground,#94a3b8)] font-medium">Title</th>
+                <th class="text-left py-2 px-3 text-[var(--muted-foreground,#94a3b8)] font-medium">Confidence</th>
+                <th class="text-left py-2 px-3 text-[var(--muted-foreground,#94a3b8)] font-medium">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b border-[var(--border,#334155)]/30 hover:bg-[var(--background,#0f172a)]/50">
+                <td class="py-2 px-3 font-mono text-xs text-blue-400">commit:a1b2c3d4</td>
+                <td class="py-2 px-3"><span class="text-xs bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded">commit</span></td>
+                <td class="py-2 px-3">Redesign auth to use capability-based security</td>
+                <td class="py-2 px-3"><div class="flex items-center gap-2"><div class="w-16 h-1.5 bg-[var(--border,#334155)] rounded-full"><div class="h-full bg-green-500 rounded-full" style="width:92%"></div></div><span class="text-xs">0.92</span></div></td>
+                <td class="py-2 px-3 text-xs text-[var(--muted-foreground,#94a3b8)]">history_rag</td>
+              </tr>
+              <tr class="border-b border-[var(--border,#334155)]/30 hover:bg-[var(--background,#0f172a)]/50">
+                <td class="py-2 px-3 font-mono text-xs text-green-400">issue:142</td>
+                <td class="py-2 px-3"><span class="text-xs bg-green-900/40 text-green-300 px-2 py-0.5 rounded">issue</span></td>
+                <td class="py-2 px-3">Security audit: password auth vulnerable to replay attacks</td>
+                <td class="py-2 px-3"><div class="flex items-center gap-2"><div class="w-16 h-1.5 bg-[var(--border,#334155)] rounded-full"><div class="h-full bg-green-500 rounded-full" style="width:87%"></div></div><span class="text-xs">0.87</span></div></td>
+                <td class="py-2 px-3 text-xs text-[var(--muted-foreground,#94a3b8)]">history_rag</td>
+              </tr>
+              <tr class="hover:bg-[var(--background,#0f172a)]/50">
+                <td class="py-2 px-3 font-mono text-xs text-purple-400">pr:89</td>
+                <td class="py-2 px-3"><span class="text-xs bg-purple-900/40 text-purple-300 px-2 py-0.5 rounded">pr</span></td>
+                <td class="py-2 px-3">PR #89: Implement capability-based auth (fixes #142)</td>
+                <td class="py-2 px-3"><div class="flex items-center gap-2"><div class="w-16 h-1.5 bg-[var(--border,#334155)] rounded-full"><div class="h-full bg-green-500 rounded-full" style="width:85%"></div></div><span class="text-xs">0.85</span></div></td>
+                <td class="py-2 px-3 text-xs text-[var(--muted-foreground,#94a3b8)]">history_rag</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Status & Features -->
+        <div class="grid grid-cols-2 gap-4 mt-4">
+          <div class="bg-[var(--background,#0f172a)] rounded-lg p-4">
+            <p class="text-xs text-[var(--muted-foreground,#94a3b8)] mb-2">Key Features</p>
+            <ul class="space-y-1.5 text-sm">
+              <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Thread-safe (Python threading.Lock)</li>
+              <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Duplicate detection by evidence ID</li>
+              <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Higher confidence replaces lower</li>
+              <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Filter by type/agent/confidence</li>
+              <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Full observability logging</li>
+              <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Serializable to dict/JSON</li>
+            </ul>
+          </div>
+          <div class="bg-[var(--background,#0f172a)] rounded-lg p-4">
+            <p class="text-xs text-[var(--muted-foreground,#94a3b8)] mb-2">Status Transitions</p>
+            <div class="space-y-2 text-sm">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-gray-500"></span>
+                <span>INITIALIZED</span>
+                <span class="text-[var(--muted-foreground,#94a3b8)]">→</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+                <span>SEARCHING</span>
+                <span class="text-[var(--muted-foreground,#94a3b8)]">→</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
+                <span>VERIFYING</span>
+                <span class="text-[var(--muted-foreground,#94a3b8)]">→</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                <span>COMPLETE</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ TAB 4: Protocols ═══════════ -->
+    <div id="tab-protocols" class="tab-content hidden">
+      <div class="bg-[var(--card,#1e293b)] border border-[var(--border,#334155)] rounded-xl p-6">
+        <h2 class="text-lg font-semibold mb-4">📡 Messaging Protocol Comparison</h2>
+        <p class="text-[var(--muted-foreground,#94a3b8)] text-sm mb-4">4 protocols implemented & compared: Blackboard vs P2P vs Broadcast vs MCP</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Blackboard -->
+          <div class="bg-[var(--background,#0f172a)] rounded-lg p-4 border border-yellow-700/30">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-xl">📋</span>
+              <h3 class="font-semibold text-yellow-300">Blackboard</h3>
+              <span class="ml-auto text-xs bg-green-900/40 text-green-300 px-2 py-0.5 rounded">RECOMMENDED</span>
+            </div>
+            <p class="text-sm text-[var(--muted-foreground,#94a3b8)] mb-3">Shared memory — all agents read/write to a central knowledge store</p>
+            <div class="space-y-1 text-xs">
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Coupling</span><span class="text-green-400">Low ✓</span></div>
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Scalability</span><span class="text-green-400">High ✓</span></div>
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Observability</span><span class="text-green-400">Excellent ✓</span></div>
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Use Case</span><span>Multi-agent evidence gathering</span></div>
+            </div>
+          </div>
+
+          <!-- P2P -->
+          <div class="bg-[var(--background,#0f172a)] rounded-lg p-4 border border-[var(--border,#334155)]">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-xl">🔗</span>
+              <h3 class="font-semibold text-blue-300">Point-to-Point (P2P)</h3>
+            </div>
+            <p class="text-sm text-[var(--muted-foreground,#94a3b8)] mb-3">Direct messages between specific agent pairs</p>
+            <div class="space-y-1 text-xs">
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Coupling</span><span class="text-yellow-400">Medium</span></div>
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Scalability</span><span class="text-yellow-400">Medium</span></div>
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Observability</span><span class="text-yellow-400">Good</span></div>
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Use Case</span><span>1:1 agent coordination</span></div>
+            </div>
+          </div>
+
+          <!-- Broadcast -->
+          <div class="bg-[var(--background,#0f172a)] rounded-lg p-4 border border-[var(--border,#334155)]">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-xl">📢</span>
+              <h3 class="font-semibold text-green-300">Broadcast (Pub/Sub)</h3>
+            </div>
+            <p class="text-sm text-[var(--muted-foreground,#94a3b8)] mb-3">Agents publish to topics, all subscribers receive messages</p>
+            <div class="space-y-1 text-xs">
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Coupling</span><span class="text-green-400">Low ✓</span></div>
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Scalability</span><span class="text-green-400">High ✓</span></div>
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Observability</span><span class="text-yellow-400">Good</span></div>
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Use Case</span><span>Event-driven agent systems</span></div>
+            </div>
+          </div>
+
+          <!-- MCP -->
+          <div class="bg-[var(--background,#0f172a)] rounded-lg p-4 border border-[var(--border,#334155)]">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-xl">🔌</span>
+              <h3 class="font-semibold text-red-300">MCP (Model Context Protocol)</h3>
+            </div>
+            <p class="text-sm text-[var(--muted-foreground,#94a3b8)] mb-3">Tool-based communication — agents expose capabilities as callable tools</p>
+            <div class="space-y-1 text-xs">
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Coupling</span><span class="text-green-400">Low ✓</span></div>
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Scalability</span><span class="text-green-400">High ✓</span></div>
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Observability</span><span class="text-green-400">Excellent ✓</span></div>
+              <div class="flex justify-between"><span class="text-[var(--muted-foreground,#94a3b8)]">Use Case</span><span>LLM-native agent ecosystems</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="mt-4 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-[var(--border,#334155)]">
+                <th class="text-left py-2 px-3 text-[var(--muted-foreground,#94a3b8)]">Feature</th>
+                <th class="text-center py-2 px-3 text-yellow-300">Blackboard</th>
+                <th class="text-center py-2 px-3 text-blue-300">P2P</th>
+                <th class="text-center py-2 px-3 text-green-300">Broadcast</th>
+                <th class="text-center py-2 px-3 text-red-300">MCP</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b border-[var(--border,#334155)]/30">
+                <td class="py-2 px-3">Agent Coupling</td>
+                <td class="text-center py-2 px-3">🟢 Low</td>
+                <td class="text-center py-2 px-3">🟡 Medium</td>
+                <td class="text-center py-2 px-3">🟢 Low</td>
+                <td class="text-center py-2 px-3">🟢 Low</td>
+              </tr>
+              <tr class="border-b border-[var(--border,#334155)]/30">
+                <td class="py-2 px-3">Adding New Agents</td>
+                <td class="text-center py-2 px-3">🟢 Easy</td>
+                <td class="text-center py-2 px-3">🔴 Hard</td>
+                <td class="text-center py-2 px-3">🟢 Easy</td>
+                <td class="text-center py-2 px-3">🟢 Easy</td>
+              </tr>
+              <tr class="border-b border-[var(--border,#334155)]/30">
+                <td class="py-2 px-3">State Inspection</td>
+                <td class="text-center py-2 px-3">🟢 Full</td>
+                <td class="text-center py-2 px-3">🟡 Partial</td>
+                <td class="text-center py-2 px-3">🟡 Partial</td>
+                <td class="text-center py-2 px-3">🟢 Full</td>
+              </tr>
+              <tr>
+                <td class="py-2 px-3">Best For</td>
+                <td class="text-center py-2 px-3 text-xs">Evidence gathering</td>
+                <td class="text-center py-2 px-3 text-xs">Simple pairs</td>
+                <td class="text-center py-2 px-3 text-xs">Event systems</td>
+                <td class="text-center py-2 px-3 text-xs">LLM ecosystems</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ TAB 5: Full Pipeline ═══════════ -->
+    <div id="tab-pipeline" class="tab-content hidden">
+      <div class="bg-[var(--card,#1e293b)] border border-[var(--border,#334155)] rounded-xl p-6">
+        <h2 class="text-lg font-semibold mb-4">⚡ Full Multi-Agent Pipeline</h2>
+        <p class="text-[var(--muted-foreground,#94a3b8)] text-sm mb-4">Complete flow from question → evidence → verification → answer</p>
+
+        <!-- Pipeline Flow -->
+        <div class="bg-[var(--background,#0f172a)] rounded-lg p-5 mb-4">
+          <div class="flex flex-col items-center gap-3">
+            <!-- Question -->
+            <div class="w-full max-w-lg bg-[var(--card,#1e293b)] border border-[var(--border,#334155)] rounded-lg p-3 text-center">
+              <p class="text-xs text-[var(--muted-foreground,#94a3b8)]">❓ User Question</p>
+              <p class="text-sm font-semibold mt-1">"Why was the authentication mechanism redesigned?"</p>
+            </div>
+            <div class="text-[var(--muted-foreground,#94a3b8)]">↓</div>
+
+            <!-- Step 1: Create Blackboard -->
+            <div class="w-full max-w-lg bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-3">
+              <div class="flex items-center gap-2">
+                <span class="badge-pipeline agent-badge">1</span>
+                <p class="text-sm font-semibold text-yellow-300">Create Blackboard</p>
+              </div>
+              <p class="text-xs text-[var(--muted-foreground,#94a3b8)] mt-1 ml-8">Initialize shared evidence store for this query</p>
+            </div>
+            <div class="text-[var(--muted-foreground,#94a3b8)]">↓</div>
+
+            <!-- Step 2: ReAct Agent -->
+            <div class="w-full max-w-lg bg-blue-900/20 border border-blue-700/30 rounded-lg p-3">
+              <div class="flex items-center gap-2">
+                <span class="badge-react agent-badge">2</span>
+                <p class="text-sm font-semibold text-blue-300">History/RAG Agent (ReAct)</p>
+              </div>
+              <p class="text-xs text-[var(--muted-foreground,#94a3b8)] mt-1 ml-8">Reason → Act → Observe loop | 6 tools | max 5 iterations</p>
+              <p class="text-xs text-blue-400 mt-1 ml-8">Tools: search_commits, search_issues, search_prs, search_all_history, get_linked, finish</p>
+            </div>
+            <div class="text-[var(--muted-foreground,#94a3b8)]">↓</div>
+
+            <!-- Step 3: CoT Verification -->
+            <div class="w-full max-w-lg bg-purple-900/20 border border-purple-700/30 rounded-lg p-3">
+              <div class="flex items-center gap-2">
+                <span class="badge-cot agent-badge">3</span>
+                <p class="text-sm font-semibold text-purple-300">Evidence Verification Agent (CoT)</p>
+              </div>
+              <p class="text-xs text-[var(--muted-foreground,#94a3b8)] mt-1 ml-8">Chain-of-Thought check: WHAT · WHY · WHO/WHEN · CONTEXT · COMPLETENESS</p>
+            </div>
+            <div class="text-[var(--muted-foreground,#94a3b8)]">↓</div>
+
+            <!-- Decision -->
+            <div class="w-full max-w-lg bg-[var(--card,#1e293b)] border-2 border-dashed border-[var(--border,#334155)] rounded-lg p-3 text-center">
+              <p class="text-sm font-semibold">Sufficient? <span class="text-green-400">YES → Step 5</span> | <span class="text-red-400">NO → Retry Step 2</span></p>
+              <p class="text-xs text-[var(--muted-foreground,#94a3b8)] mt-1">Max 3 retries with refined queries from verification agent</p>
+            </div>
+            <div class="text-[var(--muted-foreground,#94a3b8)]">↓</div>
+
+            <!-- Step 5: Answer -->
+            <div class="w-full max-w-lg bg-green-900/20 border border-green-700/30 rounded-lg p-3">
+              <div class="flex items-center gap-2">
+                <span class="badge-pipeline agent-badge">5</span>
+                <p class="text-sm font-semibold text-green-300">Generate Final Answer</p>
+              </div>
+              <p class="text-xs text-[var(--muted-foreground,#94a3b8)] mt-1 ml-8">LLM generates answer using verified evidence as context, with citations</p>
+            </div>
+            <div class="text-[var(--muted-foreground,#94a3b8)]">↓</div>
+
+            <!-- Output -->
+            <div class="w-full max-w-lg bg-[var(--card,#1e293b)] border border-green-600/40 rounded-lg p-3">
+              <p class="text-xs text-green-400 mb-1">✅ Final Output</p>
+              <p class="text-sm">"The authentication mechanism was redesigned due to a security audit (Issue #142) that discovered replay attack vulnerabilities..."</p>
+              <div class="flex gap-2 mt-2 flex-wrap">
+                <span class="text-xs bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded">📎 commit:a1b2c3d4</span>
+                <span class="text-xs bg-green-900/40 text-green-300 px-2 py-0.5 rounded">📎 issue:142</span>
+                <span class="text-xs bg-purple-900/40 text-purple-300 px-2 py-0.5 rounded">📎 pr:89</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Run Commands -->
+        <div class="bg-[var(--background,#0f172a)] rounded-lg p-4">
+          <p class="text-xs text-[var(--muted-foreground,#94a3b8)] mb-2">▶ Run It Yourself</p>
+          <div class="space-y-2">
+            <div class="bg-[var(--card,#1e293b)] rounded p-2 font-mono text-xs">
+              <span class="text-green-400">$</span> cd Agentic_AI
+            </div>
+            <div class="bg-[var(--card,#1e293b)] rounded p-2 font-mono text-xs">
+              <span class="text-green-400">$</span> set PYTHONPATH=C:/Users/Hp/Downloads/Agentic_AI;C:/Users/Hp/Downloads/Deveops/backend
+            </div>
+            <div class="bg-[var(--card,#1e293b)] rounded p-2 font-mono text-xs">
+              <span class="text-green-400">$</span> python demo.py
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tab switching
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + tabName).classList.remove('hidden');
+      event.target.classList.add('active');
+    }
+
+    // ReAct animation
+    let reactPlaying = false;
+    async function playReact() {
+      if (reactPlaying) return;
+      reactPlaying = true;
+      const btn = document.getElementById('react-play-btn');
+      btn.textContent = '⏳ Playing...';
+      btn.disabled = true;
+
+      // Reset all steps
+      document.querySelectorAll('.react-step').forEach(el => {
+        el.classList.add('step-hidden');
+        el.classList.remove('animate-fadein');
+      });
+      document.getElementById('react-summary').classList.add('step-hidden');
+      document.getElementById('react-summary').classList.remove('animate-fadein');
+
+      // Animate each step
+      const steps = document.querySelectorAll('.react-step');
+      for (let i = 0; i < steps.length; i++) {
+        await sleep(800);
+        steps[i].classList.remove('step-hidden');
+        steps[i].classList.add('animate-fadein');
+      }
+
+      // Show summary
+      await sleep(600);
+      const summary = document.getElementById('react-summary');
+      summary.classList.remove('step-hidden');
+      summary.classList.add('animate-fadein');
+
+      btn.textContent = '🔄 Replay';
+      btn.disabled = false;
+      reactPlaying = false;
+    }
+
+    // CoT animation
+    let cotPlaying = false;
+    async function playCot() {
+      if (cotPlaying) return;
+      cotPlaying = true;
+      const btn = document.getElementById('cot-play-btn');
+      btn.textContent = '⏳ Playing...';
+      btn.disabled = true;
+
+      // Reset
+      document.querySelectorAll('.cot-step').forEach(el => {
+        el.classList.add('step-hidden');
+        el.classList.remove('animate-fadein');
+      });
+      for (let i = 1; i <= 5; i++) {
+        document.getElementById('cot-check-' + i).classList.add('hidden');
+      }
+      document.getElementById('cot-verdict').classList.add('step-hidden');
+      document.getElementById('cot-verdict').classList.remove('animate-fadein');
+
+      // Animate each step
+      const steps = document.querySelectorAll('.cot-step');
+      for (let i = 0; i < steps.length; i++) {
+        await sleep(700);
+        steps[i].classList.remove('step-hidden');
+        steps[i].classList.add('animate-fadein');
+        await sleep(400);
+        document.getElementById('cot-check-' + (i+1)).classList.remove('hidden');
+      }
+
+      // Show verdict
+      await sleep(500);
+      const verdict = document.getElementById('cot-verdict');
+      verdict.classList.remove('step-hidden');
+      verdict.classList.add('animate-fadein');
+
+      btn.textContent = '🔄 Replay';
+      btn.disabled = false;
+      cotPlaying = false;
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // Auto-play ReAct on load
+    setTimeout(() => playReact(), 500);
+  </script>
+</body>
+</html>
