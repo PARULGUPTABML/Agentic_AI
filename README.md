@@ -4,11 +4,11 @@ A multi-agent system that uses RAG (Retrieval-Augmented Generation) to explain *
 
 ## Team
 
-| Member | Roll No. | Agents Owned | Infrastructure |
-|--------|----------|-------------|----------------|
-| **Parul Gupta** | 230506 | History/RAG Agent, Evidence Verification Agent | Blackboard schema, Messaging-protocol comparison |
-| **Arpita Bansal** | 230546 | Code Analysis Agent, Issue/PR Agent | LLM-as-Judge evaluation, Observability dashboard |
-| **Parul Aggarwal** | 230540 | Orchestrator Agent, Reviewer Agent | 4 Architecture-pattern variants, Evaluation question set |
+| Member  | Agents Owned | Infrastructure |
+|--------|-------------|----------------|
+| **Parul Gupta**  | History/RAG Agent, Evidence Verification Agent | Blackboard schema, Messaging-protocol comparison |
+| **Arpita Bansal**  | Code Analysis Agent, Issue/PR Agent | LLM-as-Judge evaluation, Observability dashboard |
+| **Parul Aggarwal**  | Orchestrator Agent, Reviewer Agent | 4 Architecture-pattern variants, Evaluation question set |
 
 ## Project Structure
 
@@ -30,7 +30,7 @@ Agentic_AI/
 └── test_real_pipeline.py             # Real pipeline test
 ```
 
-## Components (Parul Gupta — 230506)
+## Components (Parul Gupta)
 
 ### 1. Repository History / RAG Agent
 - **ReAct loop** (Reason → Act → Observe) with up to 5 iterations
