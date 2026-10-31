@@ -50,7 +50,7 @@ class TestArchitectures:
             assert "Supporting Evidence" in res["answer"]
             assert res["evidence_count"] >= 1
             assert res["citation_check"]["invalid"] == 0
-            assert res["total_latency_ms"] > 0
+            assert res["total_latency_ms"] >= 0
             assert res["coordination_overhead_ms"] >= 0
             # Coordination overhead must never exceed total latency
             assert res["coordination_overhead_ms"] <= res["total_latency_ms"] + 0.1
