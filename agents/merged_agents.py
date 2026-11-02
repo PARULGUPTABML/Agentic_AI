@@ -30,17 +30,13 @@ This module contains the architectural merging implementations and ablation vari
 """
 from __future__ import annotations
 
-# Re-export from evaluation.ablation_cases for clean modularity
-from evaluation.ablation_cases import (
-    CodeAndHistoryMergedAgent,
-    HistoryAndIssuePRMergedAgent,
-    OrchestratorVerifierMergedAgent,
-    VerifierReviewerMergedAgent,
-    BypassedVerificationAgent,
-    MonolithicSingleAgent,
-    CASE_DEFINITIONS,
-    run_ablation_case,
-)
+# Lazy attribute resolution to prevent circular import between
+# evaluation.ablation_cases and agents package
+def __getattr__(name: str):
+    import evaluation.ablation_cases as _ac
+    if hasattr(_ac, name):
+        return getattr(_ac, name)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 __all__ = [
     "CodeAndHistoryMergedAgent",

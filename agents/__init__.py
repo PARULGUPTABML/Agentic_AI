@@ -30,17 +30,6 @@ from agents.issue_pr_agent import IssuePRAgent
 from agents.evidence_verification_agent import EvidenceVerificationAgent
 from agents.reviewer_agent import ReviewerAgent
 
-from agents.merged_agents import (
-    CodeAndHistoryMergedAgent,
-    HistoryAndIssuePRMergedAgent,
-    OrchestratorVerifierMergedAgent,
-    VerifierReviewerMergedAgent,
-    BypassedVerificationAgent,
-    MonolithicSingleAgent,
-    CASE_DEFINITIONS,
-    run_ablation_case,
-)
-
 from agents.blackboard import (
     Blackboard,
     BlackboardStatus,
@@ -49,6 +38,24 @@ from agents.blackboard import (
 )
 from agents.messaging import Message, MessageBus
 from agents.multi_agent_pipeline import run_multi_agent
+
+# Lazy import for ablation and merged agents to prevent circular dependency
+_ABLATION_EXPORTS = {
+    "CodeAndHistoryMergedAgent",
+    "HistoryAndIssuePRMergedAgent",
+    "OrchestratorVerifierMergedAgent",
+    "VerifierReviewerMergedAgent",
+    "BypassedVerificationAgent",
+    "MonolithicSingleAgent",
+    "CASE_DEFINITIONS",
+    "run_ablation_case",
+}
+
+def __getattr__(name: str):
+    if name in _ABLATION_EXPORTS:
+        import evaluation.ablation_cases as _ac
+        return getattr(_ac, name)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 __all__ = [
     # 6 Core Agents
