@@ -28,3 +28,8 @@ Thumbs.db
 
 # Traces/logs (regenerated on each run)
 agent_trace.json
+
+# Generated Data & Results Caches
+data/
+results/
+

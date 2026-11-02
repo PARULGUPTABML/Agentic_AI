@@ -110,44 +110,41 @@ Controlled comparison between four distinct coordination topologies sharing the 
 
 ```
 Agentic_AI/
-├── architectures/              # Coordination architecture patterns
-│   ├── base.py                 # Abstract base class & metrics accounting
-│   ├── sequential.py           # Linear execution adhering to orchestrator plan
-│   ├── hierarchical.py         # Controller-driven parallel dispatch
-│   ├── event_driven.py         # In-process reactive event bus
-│   └── workflow_dag.py         # Directed Acyclic Graph executor
-├── orchestrator/               # Orchestrator agent
-│   ├── agent.py                # Manager agent implementation
-│   └── schema.py               # JSON schema & plan validation
-├── reviewer/                   # Reviewer & synthesis agent
-│   ├── agent.py                # Reviewer agent implementation
-│   ├── citation_checker.py     # Pure-code citation validation engine
-│   └── renderer.py             # Standardized Markdown response renderer
-├── agents/                     # Specialized pipeline agents
-│   ├── blackboard.py           # Shared evidence blackboard
-│   ├── history_rag_agent.py    # ReAct git history retrieval agent
-│   ├── evidence_verification_agent.py # Evidence sufficiency evaluator
-│   ├── messaging.py            # Communication protocols (Blackboard, P2P, Broadcast, MCP)
-│   ├── multi_agent_pipeline.py # End-to-end multi-agent pipeline
-│   └── _llm_retry.py          # Resilient LLM invocation helper
-├── eval_set/                   # Ground-truth evaluation dataset & tooling
-│   ├── questions.jsonl         # 35 benchmark questions (7 dev, 28 heldout)
-│   ├── heldout_hash.sha256     # Canonical SHA-256 digest of held-out set
-│   ├── validator.py            # Real git commit & schema validation tool
-│   ├── summary.py              # Dataset metrics and split distribution reporter
-│   ├── generate_eval_set.py    # Dataset generator script
-│   └── labelling_guide.md      # Ground-truth annotation standards
-├── prompts/                    # Versioned prompt definitions
+├── agents/                     # Specialized Multi-Agent Roles (All 6 Agents + Merged)
+│   ├── orchestrator_agent.py   # Agent 1: Intent parsing & task planning
+│   ├── code_analysis_agent.py  # Agent 2: AST & static code symbol retrieval
+│   ├── history_rag_agent.py    # Agent 3: Git commit history & blame traversal
+│   ├── issue_pr_agent.py       # Agent 4: GitHub PRs, issues, & code reviews
+│   ├── evidence_verification_agent.py # Agent 5: CoT gatekeeper & sufficiency check
+│   ├── reviewer_agent.py       # Agent 6: Grounded citation synthesis
+│   ├── merged_agents.py        # 2-in-1 Merged Agents (Code+History, History+PR, etc.)
+│   ├── blackboard.py           # Shared thread-safe evidence blackboard store
+│   └── messaging.py            # Pub/sub inter-agent event bus
+├── architectures/              # 4 Coordination Topologies
+│   ├── sequential.py           # 1. Sequential Pipeline (linear serial execution)
+│   ├── hierarchical.py         # 2. Hierarchical Controller (parallel worker pool)
+│   ├── event_driven.py         # 3. Event-Driven Bus (reactive pub/sub bus)
+│   └── workflow_dag.py         # 4. Workflow DAG (state machine with fork/join)
+├── evaluation/                 # Rigorous Evaluation & Ablation Framework
+│   ├── ablation_cases.py       # All 8 ablation & merging test cases
+│   ├── judge.py                # LLM-as-a-Judge implementation (4-point rubric)
+│   ├── metrics.py              # Precision, Recall, Hallucination, Citation coverage
+│   └── stats.py                # Paired permutation tests & bootstrap CIs
+├── ingestion/                  # Multi-Modal Repository Indexing
+│   ├── extract_code.py         # C/C++ AST syntax parsing
+│   ├── extract_git.py          # Git commit log & blame extractor
+│   ├── issue_pr_extractor.py   # GitHub issues & PR thread extractor
+│   └── build_index.py          # BM25 search indices builder
+├── static/                     # Web Application Frontend (Dashboard & Live Query)
+│   ├── index.html              # 4-Tab Single Page Application UI
+│   ├── style.css               # Glassmorphism dark-theme design
+│   └── app.js                  # Frontend logic & live API integration
+├── prompts/                    # Versioned Prompt Definitions
 │   ├── orchestrator_system.md  # Orchestrator system prompt
 │   ├── reviewer_system.md      # Reviewer system prompt
 │   └── reviewer_entailment.md  # Entailment spot-check prompt
-├── docs/                       # Architectural & methodology documentation
-│   ├── system_overview.md      # End-to-end multi-agent system overview
-│   ├── orchestrator_agent.md   # Orchestrator methodology guide
-│   ├── reviewer_agent.md       # Reviewer & citation checker guide
-│   ├── architecture_variants.md# 4 coordination architectures comparative guide
-│   └── evaluation_question_set.md # Benchmark design & verification methodology
-├── tests/                      # Unified test suite (61 tests)
+├── docs/                       # Architectural & Methodology Documentation
+├── tests/                      # Unified Test Suite (148 tests)
 │   ├── conftest.py             # Mock fixtures & environment setup
 │   ├── test_agents.py          # Pipeline & retrieval unit/integration tests
 │   ├── test_architectures.py   # Architecture parity & coordination tests

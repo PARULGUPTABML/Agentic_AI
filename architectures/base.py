@@ -99,6 +99,17 @@ class Architecture(abc.ABC):
             "rounds": rounds,
             "agents_invoked": agents_invoked,
             "evidence_count": blackboard.evidence_count(),
+            "evidence": [
+                {
+                    "id": e.id,
+                    "type": e.evidence_type,
+                    "title": e.title,
+                    "confidence": e.confidence,
+                    "content": e.content,
+                    "source_agent": e.source_agent
+                }
+                for e in blackboard.get_evidence()
+            ],
             "total_latency_ms": round(total_latency_ms, 2),
             "coordination_overhead_ms": round(coordination_time_ms, 2),
             "agent_latency_ms": round(max(0.0, total_latency_ms - coordination_time_ms), 2),

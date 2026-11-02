@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReadMind — Multi-Agent Architecture Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css?v=16">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+
+  <div class="app-container">
+
+    <!-- Top Navigation Header matching reference screenshot 2-row layout -->
+    <header class="header">
+      <!-- Row 1: Brand on left, Repository & Model controls on right -->
+      <div class="header-top-row">
+        <div class="brand-section">
+          <div class="brand-logo-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-5.04z"/>
+              <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-5.04z"/>
+            </svg>
+          </div>
+          <span class="brand-title">ReadMind</span>
+        </div>
+
+        <div class="header-controls-row">
+          <span class="header-repo-label">Repository</span>
+          <select id="header-repo-select" class="header-repo-select" onchange="onHeaderRepoSelectChanged()">
+            <!-- Populated dynamically from /api/repositories -->
+          </select>
+          <div class="model-picker-wrapper">
+            <div class="header-llm-pill" id="header-llm-pill" onclick="toggleModelDropdown(event)">
+              <span class="status-dot"></span>
+              <span id="header-model-name">gemini · gemini-3.5-flash</span>
+              <svg class="model-select-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m7 15 5 5 5-5"/>
+                <path d="m7 9 5-5 5 5"/>
+              </svg>
+            </div>
+            <div class="model-dropdown-menu" id="model-dropdown-menu">
+              <div class="model-dropdown-item active" onclick="selectModel('gemini · gemini-3.5-flash')">
+                <span class="model-item-dot active"></span>
+                <span>gemini · gemini-3.5-flash</span>
+                <span class="check-mark">✓</span>
+              </div>
+              <div class="model-dropdown-item" onclick="selectModel('gemini · gemini-3-flash-preview')">
+                <span class="model-item-dot"></span>
+                <span>gemini · gemini-3-flash-preview</span>
+              </div>
+              <div class="model-dropdown-item" onclick="selectModel('gemini · gemini-2.5-pro')">
+                <span class="model-item-dot"></span>
+                <span>gemini · gemini-2.5-pro</span>
+              </div>
+              <div class="model-dropdown-item" onclick="selectModel('mock · offline-ci')">
+                <span class="model-item-dot"></span>
+                <span>mock · offline-ci</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2: Navigation Tabs on left, Inline Stats on right -->
+      <div class="header-bottom-row">
+        <nav class="nav-tabs" role="tablist">
+          <button class="nav-link-btn active" id="tab-btn-knowledge" onclick="switchTab('knowledge')">
+            Knowledge Base
+          </button>
+          <button class="nav-link-btn" id="tab-btn-ask" onclick="switchTab('ask')">
+            Ask
+          </button>
+          <button class="nav-link-btn" id="tab-btn-compare" onclick="switchTab('compare')">
+            Compare architecture
+          </button>
+          <button class="nav-link-btn" id="tab-btn-evaluation" onclick="switchTab('evaluation')">
+            Evaluation
+          </button>
+        </nav>
+
+        <div class="header-stats-line" id="header-stats-line">
+          1,898 code · 131 doc · 1,026 commit · 119 issue · 400 pr · 1,319 review
+        </div>
+      </div>
+    </header>
+
+    <!-- ============================================================== -->
+    <!--  PART 1: KNOWLEDGE BASE (EXACT MATCH TO REFERENCE DESIGN)      -->
+    <!-- ============================================================== -->
+    <main id="tab-knowledge" class="tab-content active">
+
+      <!-- Add Your Own Repository -->
+      <section class="kb-add-repo-box">
+        <div class="kb-add-repo-header">
+          <span class="kb-sparkle">✨</span>
+          <span class="kb-add-repo-title">Add Your Own Repository</span>
+        </div>
+        <p class="kb-add-repo-sub">
+          Enter a public GitHub repository link to download its complete history into the Knowledge Base.
+        </p>
+        <div class="kb-add-repo-input-row">
+          <input type="text" id="add-repo-input" class="kb-input-field" placeholder="e.g. parulaggarwal23/PolicyPal-AI">
+          <button id="btn-verify-add" class="kb-btn-verify" onclick="verifyAndAddRepository()">
+            <span id="btn-verify-text">Verify & Add</span>
+          </button>
+        </div>
+        <div id="add-repo-feedback" class="feedback-msg" style="display: none;"></div>
+      </section>
+
+      <!-- Currently Loaded Repositories -->
+      <section class="kb-loaded-section">
+        <h3 class="kb-loaded-title">Currently Loaded Repositories</h3>
+        <div class="kb-pills-row" id="kb-pills-row">
+          <!-- Populated dynamically from /api/repositories -->
+        </div>
+      </section>
+
+      <!-- Stats Center Header & Delete Button -->
+      <section class="kb-stats-bar">
+        <div class="kb-stats-center">
+          <h2 class="kb-stats-heading">
+            Knowledge Base Stats: <code class="kb-code-pill" id="kb-active-slug">CHERIoT-Platform__cheriot-rtos</code>
+          </h2>
+          <p class="kb-stats-sub">
+            Click on any category card below to inspect all its indexed records in detail.
+          </p>
+        </div>
+        <div class="kb-stats-right">
+          <button class="kb-btn-delete" id="btn-delete-repo" onclick="deleteActiveRepository()">
+            <span>🗑️</span> Delete Repo
+          </button>
+        </div>
+      </section>
+
+      <!-- The 5 Category Cards -->
+      <section class="kb-cards-grid">
+
+        <!-- Card 1: Source Code & Docs -->
+        <div class="kb-card card-blue-top" onclick="openInspectModal('code')">
+          <div class="kb-card-header">
+            <span class="kb-card-icon">📄</span>
+            <span class="kb-card-name">Source Code & Docs</span>
+          </div>
+          <div class="kb-card-count-row">
+            <span class="kb-count-val val-blue" id="kb-count-code">2,029</span>
+            <span class="kb-count-unit">items</span>
+          </div>
+          <p class="kb-card-desc">
+            Functions, classes, and documentation extracted directly from the repository files.
+          </p>
+          <div class="kb-card-footer">
+            <span class="kb-footer-label">Explore Source Code & Docs</span>
+            <span class="kb-footer-link link-blue">View →</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Git Commits -->
+        <div class="kb-card card-orange-top" onclick="openInspectModal('commit')">
+          <div class="kb-card-header">
+            <span class="kb-card-icon">📦</span>
+            <span class="kb-card-name">Git Commits</span>
+          </div>
+          <div class="kb-card-count-row">
+            <span class="kb-count-val val-orange" id="kb-count-commits">1,026</span>
+            <span class="kb-count-unit">items</span>
+          </div>
+          <p class="kb-card-desc">
+            Historical commit messages and code diffs showing how the code evolved over time.
+          </p>
+          <div class="kb-card-footer">
+            <span class="kb-footer-label">Explore Git Commits</span>
+            <span class="kb-footer-link link-orange">View →</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Pull Requests -->
+        <div class="kb-card card-teal-top" onclick="openInspectModal('pr')">
+          <div class="kb-card-header">
+            <span class="kb-card-icon">🔄</span>
+            <span class="kb-card-name">Pull Requests</span>
+          </div>
+          <div class="kb-card-count-row">
+            <span class="kb-count-val val-teal" id="kb-count-prs">400</span>
+            <span class="kb-count-unit">items</span>
+          </div>
+          <p class="kb-card-desc">
+            PR titles, descriptions, and the discussions that happened before code was merged.
+          </p>
+          <div class="kb-card-footer">
+            <span class="kb-footer-label">Explore Pull Requests</span>
+            <span class="kb-footer-link link-teal">View →</span>
+          </div>
+        </div>
+
+        <!-- Card 4: GitHub Issues -->
+        <div class="kb-card card-pink-top" onclick="openInspectModal('issue')">
+          <div class="kb-card-header">
+            <span class="kb-card-icon">🪲</span>
+            <span class="kb-card-name">GitHub Issues</span>
+          </div>
+          <div class="kb-card-count-row">
+            <span class="kb-count-val val-pink" id="kb-count-issues">119</span>
+            <span class="kb-count-unit">items</span>
+          </div>
+          <p class="kb-card-desc">
+            Bug reports, feature requests, and developer conversations about problems.
+          </p>
+          <div class="kb-card-footer">
+            <span class="kb-footer-label">Explore GitHub Issues</span>
+            <span class="kb-footer-link link-pink">View →</span>
+          </div>
+        </div>
+
+        <!-- Card 5: Code Reviews -->
+        <div class="kb-card card-yellow-top" onclick="openInspectModal('review')">
+          <div class="kb-card-header">
+            <span class="kb-card-icon">👀</span>
+            <span class="kb-card-name">Code Reviews</span>
+          </div>
+          <div class="kb-card-count-row">
+            <span class="kb-count-val val-yellow" id="kb-count-reviews">1,319</span>
+            <span class="kb-count-unit">items</span>
+          </div>
+          <p class="kb-card-desc">
+            Inline comments left by reviewers on specific lines of code.
+          </p>
+          <div class="kb-card-footer">
+            <span class="kb-footer-label">Explore Code Reviews</span>
+            <span class="kb-footer-link link-yellow">View →</span>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Bottom underline spanning the 5 cards -->
+      <div class="kb-underline"></div>
+
+    </main>
+
+    <!-- ============================================================== -->
+    <!--  PART 2: ASK (MULTI-AGENT ASSISTANT)                           -->
+    <!-- ============================================================== -->
+    <!-- ============================================================== -->
+    <!--  PART 2: ASK (MULTI-AGENT ASSISTANT)                           -->
+    <!-- ============================================================== -->
+    <main id="tab-ask" class="tab-content">
+
+      <!-- Query Prompt Box Matching Screenshot -->
+      <section class="ask-main-box">
+        <div class="ask-textarea-wrapper">
+          <textarea class="ask-textarea" id="question-input" rows="3" placeholder='Ask why the code is the way it is... e.g. "Why does login rotate the session id?"'></textarea>
+        </div>
+
+        <!-- Horizontal Controls Bar: Evaluation/Ablation Modes on Left, Ask Button on Right -->
+        <div class="ask-controls-bar">
+          <div class="ask-modes-row">
+            <button class="ask-mode-radio active" id="btn-mode-baseline_5_agent" onclick="selectAblationMode('baseline_5_agent')">
+              <span class="mode-radio-dot" style="background: #10b981;"></span>
+              <span>Full 6-Agent System (Baseline)</span>
+            </button>
+            <button class="ask-mode-radio" id="btn-mode-merge_code_history" onclick="selectAblationMode('merge_code_history')">
+              <span class="mode-radio-dot" style="background: #38bdf8;"></span>
+              <span>Merge Code + History</span>
+            </button>
+            <button class="ask-mode-radio" id="btn-mode-merge_history_issue_pr" onclick="selectAblationMode('merge_history_issue_pr')">
+              <span class="mode-radio-dot" style="background: #fb923c;"></span>
+              <span>Merge History + Issue/PR</span>
+            </button>
+            <button class="ask-mode-radio" id="btn-mode-merge_orchestrator_verifier" onclick="selectAblationMode('merge_orchestrator_verifier')">
+              <span class="mode-radio-dot" style="background: #a855f7;"></span>
+              <span>Merge Orchestrator + Verifier</span>
+            </button>
+            <button class="ask-mode-radio" id="btn-mode-minus_verification" onclick="selectAblationMode('minus_verification')">
+              <span class="mode-radio-dot" style="background: #f43f5e;"></span>
+              <span>Without Verification Agent</span>
+            </button>
+            <button class="ask-mode-radio" id="btn-mode-minus_code_analysis" onclick="selectAblationMode('minus_code_analysis')">
+              <span class="mode-radio-dot" style="background: #ef4444;"></span>
+              <span>Without Code Analysis Agent</span>
+            </button>
+            <button class="ask-mode-radio" id="btn-mode-minus_issue_pr" onclick="selectAblationMode('minus_issue_pr')">
+              <span class="mode-radio-dot" style="background: #f97316;"></span>
+              <span>Without Issue &amp; PR Agent</span>
+            </button>
+            <button class="ask-mode-radio" id="btn-mode-monolithic_single_agent" onclick="selectAblationMode('monolithic_single_agent')">
+              <span class="mode-radio-dot" style="background: #94a3b8;"></span>
+              <span>Monolithic Single Agent</span>
+            </button>
+          </div>
+
+          <div class="ask-actions-group">
+            <div class="arch-picker-wrapper" id="arch-picker-wrapper">
+              <button type="button" class="btn-arch-picker" id="btn-arch-picker" onclick="toggleArchDropdown(event)" title="Select coordination architecture topology">
+                <span id="arch-picker-icon">➡️</span>
+                <span id="arch-picker-label">Sequential</span>
+                <span class="arch-picker-arrow" id="arch-picker-arrow">▾</span>
+              </button>
+              <div class="arch-dropdown-menu" id="arch-dropdown-menu">
+                <div class="arch-dropdown-item active" data-arch="sequential" onclick="selectCoordinationArch('sequential', 'Sequential', '➡️')">
+                  <div class="arch-item-title-row">
+                    <div class="arch-item-left">
+                      <span>➡️</span>
+                      <span class="arch-item-name">Sequential Pipeline</span>
+                    </div>
+                    <span class="arch-item-tag tag-amber">Serial</span>
+                  </div>
+                  <p class="arch-item-desc">Deterministic linear pipeline (Concurrency = 1)</p>
+                </div>
+                <div class="arch-dropdown-item" data-arch="hierarchical" onclick="selectCoordinationArch('hierarchical', 'Hierarchical', '🏛️')">
+                  <div class="arch-item-title-row">
+                    <div class="arch-item-left">
+                      <span>🏛️</span>
+                      <span class="arch-item-name">Hierarchical Controller</span>
+                    </div>
+                    <span class="arch-item-tag tag-blue">Parallel</span>
+                  </div>
+                  <p class="arch-item-desc">Master controller with concurrent worker thread pool</p>
+                </div>
+                <div class="arch-dropdown-item" data-arch="event_driven" onclick="selectCoordinationArch('event_driven', 'Event-Driven', '⚡')">
+                  <div class="arch-item-title-row">
+                    <div class="arch-item-left">
+                      <span>⚡</span>
+                      <span class="arch-item-name">Event-Driven Bus</span>
+                    </div>
+                    <span class="arch-item-tag tag-green">Pub/Sub</span>
+                  </div>
+                  <p class="arch-item-desc">Reactive asynchronous pub/sub event bus</p>
+                </div>
+                <div class="arch-dropdown-item" data-arch="workflow_dag" onclick="selectCoordinationArch('workflow_dag', 'Workflow DAG', '🔀')">
+                  <div class="arch-item-title-row">
+                    <div class="arch-item-left">
+                      <span>🔀</span>
+                      <span class="arch-item-name">Workflow DAG</span>
+                    </div>
+                    <span class="arch-item-tag tag-purple">DAG</span>
+                  </div>
+                  <p class="arch-item-desc">DAG state machine with fork/join synchronization</p>
+                </div>
+              </div>
+            </div>
+
+            <button class="btn-ask-primary" id="run-query-btn" onclick="executeLiveQuery()">
+              <span id="btn-text">Ask</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Preset Suggestion Chips (Screenshot Row 3) -->
+        <div class="preset-chips-row">
+          <div class="preset-chip-pill" onclick="setQuestionText('Why was the authentication logic implemented this way?')">
+            Why was the authentication logic implemented this way?
+          </div>
+          <div class="preset-chip-pill" onclick="setQuestionText('Which issue led to the most recent change in the retry handling?')">
+            Which issue led to the most recent change in the retry handling?
+          </div>
+          <div class="preset-chip-pill" onclick="setQuestionText('Has this module had bugs before, and what caused them?')">
+            Has this module had bugs before, and what caused them?
+          </div>
+          <div class="preset-chip-pill" onclick="setQuestionText('What should I watch out for if I refactor the config loader?')">
+            What should I watch out for if I refactor the config loader?
+          </div>
+        </div>
+      </section>
+
+      <!-- Results Area (Direct, Focused AI Answer Card with Active Architecture Badge) -->
+      <div id="results-area" style="display: none; margin-top: 24px;">
+
+        <!-- Ablation Callout Notice (dynamic) -->
+        <div id="ablation-alert-callout" class="ablation-warning-callout" style="display: none; margin-bottom: 20px;"></div>
+
+        <!-- Clean, Focused AI Assistant Answer Card -->
+        <section class="glass-card chat-response-card" id="chat-response-card">
+          <div class="card-title-row chat-card-header">
+            <div class="chat-header-left">
+              <span class="chat-sparkle-icon">✨</span>
+              <h3 class="chat-title">Answer</h3>
+            </div>
+            <div class="chat-header-right">
+              <button type="button" class="btn-methodology-toggle" id="btn-methodology-toggle" onclick="toggleMethodologyDrawer()" title="View multi-agent execution methodology and routing sequence">
+                <span class="btn-methodology-icon">⚡</span>
+                <span class="btn-methodology-label">Methodology</span>
+                <span class="btn-methodology-arrow" id="methodology-toggle-arrow">▼</span>
+              </button>
+              <span class="pill-badge badge-blue" id="active-architecture-badge">Full 6-Agent System (Baseline)</span>
+              <span class="pill-badge badge-green" id="pipeline-status-badge">Completed in 1.4ms</span>
+            </div>
+          </div>
+
+          <!-- Collapsible Agent Methodology Flow (Hidden by default, shown when user clicks Methodology) -->
+          <div id="methodology-drawer" class="methodology-drawer" style="display: none;">
+            <!-- Dynamically populated via renderMethodologyFlow -->
+          </div>
+
+          <!-- Direct, In-Depth Formatted Answer Body -->
+          <div id="chat-answer-body" class="chat-answer-body">
+            <!-- Populated dynamically with specific, direct technical answer -->
+          </div>
+
+          <!-- Retrieved Evidence Section Directly Below the Answer -->
+          <div class="retrieved-evidence-section" id="retrieved-evidence-section" style="margin-top: 28px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+              <h4 style="font-size: 1rem; font-weight: 600; color: #f1f5f9; display: flex; align-items: center; gap: 8px; margin: 0;">
+                <span>📚</span>
+                <span>Retrieved Evidence (<span id="retrieved-evidence-count">8</span>)</span>
+              </h4>
+            </div>
+            <div class="retrieved-evidence-list" id="retrieved-evidence-list">
+              <!-- Dynamically populated with evidence cards with badges -->
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+    </main>
+
+    <!-- ============================================================== -->
+    <!--  PART 3: COMPARE ARCHITECTURE                                  -->
+    <!-- ============================================================== -->
+    <main id="tab-compare" class="tab-content">
+
+      <!-- Header & Scope Card -->
+      <div class="glass-card">
+        <div class="card-title-row">
+          <h2 class="card-title"><span>⚖️</span> 4 Multi-Agent Architecture Topology Patterns</h2>
+          <span class="pill-badge badge-blue">Visual Dataflow &amp; Execution Models</span>
+        </div>
+        <p class="section-desc">
+          Interactive architectural flowcharts explaining how multi-agent coordination operates across the 4 fundamental topologies implemented in ReadMind: <strong>Sequential</strong> (strict one-by-one linear pipeline), <strong>Hierarchical</strong> (central master controller dispatching parallel worker threads), <strong>Event-Driven</strong> (decoupled reactive pub/sub event bus), and <strong>Workflow-Based</strong> (formal DAG state machine with fork/join barriers and conditional feedback loops).
+        </p>
+
+        <!-- Interactive Architecture View Selector Bar -->
+        <div class="arch-view-controls-bar">
+          <div class="arch-filter-pills" id="arch-view-tabs">
+            <button class="arch-filter-btn active" id="btn-view-all" onclick="selectArchitectureView('all')">
+              <span>👁️</span> All 4 Architectures
+            </button>
+            <button class="arch-filter-btn" id="btn-view-sequential" onclick="selectArchitectureView('sequential')">
+              <span>➡️</span> 1. Sequential Pipeline
+            </button>
+            <button class="arch-filter-btn" id="btn-view-hierarchical" onclick="selectArchitectureView('hierarchical')">
+              <span>🏛️</span> 2. Hierarchical Controller
+            </button>
+            <button class="arch-filter-btn" id="btn-view-event_driven" onclick="selectArchitectureView('event_driven')">
+              <span>⚡</span> 3. Event-Driven Bus
+            </button>
+            <button class="arch-filter-btn" id="btn-view-workflow_dag" onclick="selectArchitectureView('workflow_dag')">
+              <span>🔀</span> 4. Workflow DAG
+            </button>
+          </div>
+
+          <!-- Step Flow Simulation Controls -->
+          <div class="arch-sim-actions">
+            <button class="btn-sim-play" id="btn-sim-play" onclick="toggleStepSimulation()">
+              <span id="sim-icon">▶️</span> <span id="sim-btn-text">Simulate Agent Flow</span>
+            </button>
+            <button class="btn-sim-reset" id="btn-sim-reset" onclick="resetStepSimulation()">
+              <span>↺</span> Reset
+            </button>
+            <div class="sim-status-indicator" id="sim-status-box">
+              <span class="sim-dot" id="sim-status-dot"></span>
+              <span id="sim-status-text">Ready: Click Simulate to watch agents move through each topology</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Container for the 4 Architecture Graphs -->
+      <div class="arch-graphs-wrapper" id="arch-graphs-wrapper">
+
+        <!-- ============================================================== -->
+        <!--  1. SEQUENTIAL ARCHITECTURE GRAPH                             -->
+        <!-- ============================================================== -->
+        <div class="arch-graph-section" id="section-arch-sequential">
+          <div class="glass-card arch-graph-card arch-card-amber">
+            <div class="arch-graph-header">
+              <div class="arch-graph-title-group">
+                <span class="arch-graph-icon">➡️</span>
+                <div>
+                  <h3 class="arch-graph-title">1. Sequential Architecture</h3>
+                  <span class="arch-graph-subtitle">Linear One-by-One Pipeline · Serialized Execution Chain</span>
+                </div>
+              </div>
+              <div class="arch-badge-group">
+                <span class="pill-badge badge-amber">Strict Serial Pipeline</span>
+                <span class="arch-prop-pill">Single Thread (Concurrency = 1)</span>
+              </div>
+            </div>
+
+            <!-- Core Working Principle Banner -->
+            <div class="arch-principle-banner banner-amber">
+              <span class="principle-icon">💡</span>
+              <div class="principle-text">
+                <strong>How It Works:</strong> Agents execute strictly <em>one after another</em> in a deterministic linear chain. No two agents execute simultaneously. Each agent waits for the preceding agent to finish its retrieval and write to the shared Blackboard before it can start. If evidence is insufficient, it triggers a linear re-plan loop back to Orchestrator (max 2 rounds).
+              </div>
+            </div>
+
+            <!-- Visual Flowchart Diagram -->
+            <div class="flowchart-container" id="flowchart-sequential">
+              <div class="flow-step-node" id="seq-step-0" data-step="0">
+                <div class="step-badge">INPUT</div>
+                <div class="step-card">
+                  <div class="step-title"><span>❓</span> User Question</div>
+                  <div class="step-desc">Natural language architectural query ingested into the pipeline</div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Step 1 starts</span></div>
+
+              <div class="flow-step-node" id="seq-step-1" data-step="1">
+                <div class="step-badge badge-amber">STEP 1 · PLANNING</div>
+                <div class="step-card">
+                  <div class="step-title"><span>🧠</span> Orchestrator Agent</div>
+                  <div class="step-desc">Deconstructs question and prescribes fixed one-by-one execution order: <code>Code ➔ History ➔ Issue/PR</code></div>
+                  <div class="step-detail-tag">Single thread: Planned execution list created</div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Code Agent executes (Other agents wait)</span></div>
+
+              <div class="flow-step-node" id="seq-step-2" data-step="2">
+                <div class="step-badge badge-blue">STEP 2 · 1ST RETRIEVER</div>
+                <div class="step-card">
+                  <div class="step-title"><span>💻</span> Code Analysis Agent</div>
+                  <div class="step-desc">Scans active AST, source files, and kernel paging headers</div>
+                  <div class="step-sub-status"><span class="status-active-dot text-amber">●</span> Running (1/3) — History RAG &amp; Issue/PR must wait</div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Code Agent finishes · History Agent starts</span></div>
+
+              <div class="flow-step-node" id="seq-step-3" data-step="3">
+                <div class="step-badge badge-cyan">STEP 3 · 2ND RETRIEVER</div>
+                <div class="step-card">
+                  <div class="step-title"><span>📜</span> Git History RAG Agent</div>
+                  <div class="step-desc">Executes only after Code Agent finishes. Retrieves commit history and author diffs</div>
+                  <div class="step-sub-status"><span class="status-active-dot text-amber">●</span> Running (2/3) — Issue/PR agent still waiting</div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">History Agent finishes · Issue/PR starts</span></div>
+
+              <div class="flow-step-node" id="seq-step-4" data-step="4">
+                <div class="step-badge badge-purple">STEP 4 · 3RD RETRIEVER</div>
+                <div class="step-card">
+                  <div class="step-title"><span>🪲</span> Issue &amp; PR Extractor</div>
+                  <div class="step-desc">Executes 3rd in line. Pulls pull requests, bug discussions, and review threads</div>
+                  <div class="step-sub-status"><span class="status-active-dot text-green">●</span> Running (3/3) — All serial retrievals now complete</div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Writes accumulated evidence</span></div>
+
+              <div class="flow-step-node" id="seq-step-5" data-step="5">
+                <div class="step-badge badge-gray">STEP 5 · SHARED STATE</div>
+                <div class="step-card">
+                  <div class="step-title"><span>📋</span> Shared Blackboard (Sequential Accumulator)</div>
+                  <div class="step-desc">Holds linearly appended evidence chunks collected in strict FIFO arrival order</div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Pass to gatekeeper</span></div>
+
+              <div class="flow-step-node" id="seq-step-6" data-step="6">
+                <div class="step-badge badge-orange">STEP 6 · SUFFICIENCY GATE</div>
+                <div class="step-card">
+                  <div class="step-title"><span>🛡️</span> Verifier Agent (Cross-Validation)</div>
+                  <div class="step-desc">Evaluates Chain-of-Thought validity, citation ground truth, and evidence sufficiency</div>
+                  <div class="conditional-loop-box loop-amber">
+                    <span class="loop-tag">🔄 Conditional Re-Plan Loop:</span> If evidence &lt; 3 chunks or confidence &lt; 0.6, loops back to Step 1 (Max 2 rounds)
+                  </div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Evidence approved</span></div>
+
+              <div class="flow-step-node" id="seq-step-7" data-step="7">
+                <div class="step-badge badge-green">STEP 7 · SYNTHESIS</div>
+                <div class="step-card">
+                  <div class="step-title"><span>✍️</span> Reviewer Agent</div>
+                  <div class="step-desc">Synthesizes verified evidence into final multi-source architectural report</div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Final output</span></div>
+
+              <div class="flow-step-node" id="seq-step-8" data-step="8">
+                <div class="step-badge badge-emerald">OUTPUT</div>
+                <div class="step-card">
+                  <div class="step-title"><span>🎯</span> Verified Architectural Answer</div>
+                  <div class="step-desc">Delivered to user with citations and complete execution audit trail</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Architectural Characteristics Grid -->
+            <div class="arch-meta-grid">
+              <div class="arch-meta-card">
+                <div class="meta-label">Control Topology</div>
+                <div class="meta-val">Linear Directed Chain</div>
+                <div class="meta-sub">Unidirectional pipeline handoff from Step 1 to Step 7</div>
+              </div>
+              <div class="arch-meta-card">
+                <div class="meta-label">Concurrency Strategy</div>
+                <div class="meta-val">Single-Threaded Serial</div>
+                <div class="meta-sub">Strictly one agent active at any given moment</div>
+              </div>
+              <div class="arch-meta-card">
+                <div class="meta-label">Memory &amp; State</div>
+                <div class="meta-val">FIFO Blackboard Accumulator</div>
+                <div class="meta-sub">Each agent reads previous outputs and appends its findings</div>
+              </div>
+              <div class="arch-meta-card">
+                <div class="meta-label">Key Trade-off</div>
+                <div class="meta-val">High Predictability · Serial Delay</div>
+                <div class="meta-sub">Easy to debug &amp; deterministic, but agents cannot run in parallel</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!--  2. HIERARCHICAL ARCHITECTURE GRAPH                           -->
+        <!-- ============================================================== -->
+        <div class="arch-graph-section" id="section-arch-hierarchical">
+          <div class="glass-card arch-graph-card arch-card-blue">
+            <div class="arch-graph-header">
+              <div class="arch-graph-title-group">
+                <span class="arch-graph-icon">🏛️</span>
+                <div>
+                  <h3 class="arch-graph-title">2. Hierarchical Architecture</h3>
+                  <span class="arch-graph-subtitle">Central Controller Pattern · Multi-Threaded Worker Pool</span>
+                </div>
+              </div>
+              <div class="arch-badge-group">
+                <span class="pill-badge badge-blue">Master-Worker Pattern</span>
+                <span class="arch-prop-pill">Parallel ThreadPool (3 Concurrent Workers)</span>
+              </div>
+            </div>
+
+            <!-- Core Working Principle Banner -->
+            <div class="arch-principle-banner banner-blue">
+              <span class="principle-icon">💡</span>
+              <div class="principle-text">
+                <strong>How It Works:</strong> A centralized Master Controller (Orchestrator) manages worker subtasks. Instead of waiting one-by-one, the controller dispatches all 3 retrieval agents <em>concurrently in parallel</em> using a <code>ThreadPoolExecutor</code>. All 3 workers write simultaneously into a thread-safe Blackboard. The Master Controller waits for barrier synchronization before routing to Verifier and Reviewer.
+              </div>
+            </div>
+
+            <!-- Visual Flowchart Diagram -->
+            <div class="flowchart-container" id="flowchart-hierarchical">
+              <div class="flow-step-node" id="hier-step-0" data-step="0">
+                <div class="step-badge">INPUT</div>
+                <div class="step-card">
+                  <div class="step-title"><span>❓</span> User Question</div>
+                  <div class="step-desc">Question arrives at the Central Controller</div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Controller ingests question</span></div>
+
+              <!-- Top Master Controller Node -->
+              <div class="flow-step-node" id="hier-step-1" data-step="1">
+                <div class="step-badge badge-blue">CENTRAL MASTER CONTROLLER</div>
+                <div class="step-card highlight-controller">
+                  <div class="step-title"><span>👑</span> Orchestrator Agent (Master Controller)</div>
+                  <div class="step-desc">Decomposes question into 3 independent sub-tasks and assigns them concurrently into the thread pool</div>
+                  <div class="controller-dispatch-badge">⚡ Concurrently Spawns 3 Worker Threads</div>
+                </div>
+              </div>
+
+              <!-- Parallel Worker Radiating Arrows -->
+              <div class="fork-radiating-banner">
+                <span class="fork-tag">⚡ PARALLEL THREAD POOL DISPATCH — All 3 Workers Run Simultaneously</span>
+              </div>
+
+              <!-- 3 Parallel Worker Cards in Horizontal Grid -->
+              <div class="parallel-workers-row" id="hier-step-workers">
+                <div class="worker-thread-col" id="hier-step-2a" data-step="2a">
+                  <div class="step-badge badge-blue">THREAD 1 · PARALLEL</div>
+                  <div class="step-card worker-card">
+                    <div class="step-title"><span>💻</span> Code Analysis Agent</div>
+                    <div class="step-desc">Scans source AST &amp; headers in Worker Thread 1</div>
+                    <div class="thread-badge">Parallel Thread #1</div>
+                  </div>
+                </div>
+
+                <div class="worker-thread-col" id="hier-step-2b" data-step="2b">
+                  <div class="step-badge badge-cyan">THREAD 2 · PARALLEL</div>
+                  <div class="step-card worker-card">
+                    <div class="step-title"><span>📜</span> Git History RAG Agent</div>
+                    <div class="step-desc">Searches commit logs &amp; diffs in Worker Thread 2</div>
+                    <div class="thread-badge">Parallel Thread #2</div>
+                  </div>
+                </div>
+
+                <div class="worker-thread-col" id="hier-step-2c" data-step="2c">
+                  <div class="step-badge badge-purple">THREAD 3 · PARALLEL</div>
+                  <div class="step-card worker-card">
+                    <div class="step-title"><span>🪲</span> Issue &amp; PR Extractor</div>
+                    <div class="step-desc">Pulls GitHub discussions in Worker Thread 3</div>
+                    <div class="thread-badge">Parallel Thread #3</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Convergence Arrow -->
+              <div class="flow-arrow-down"><span class="arrow-symbol">▼</span> <span class="arrow-label">Concurrent write into thread-safe Blackboard</span></div>
+
+              <!-- Thread-Safe Blackboard -->
+              <div class="flow-step-node" id="hier-step-3" data-step="3">
+                <div class="step-badge badge-gray">THREAD-SAFE SHARED MEMORY</div>
+                <div class="step-card">
+                  <div class="step-title"><span>📋</span> Thread-Safe Shared Blackboard (Mutex Lock)</div>
+                  <div class="step-desc">Protected by mutex lock to allow simultaneous safe writes from all 3 concurrent worker threads</div>
+                  <div class="barrier-badge">🔒 Barrier Synchronization: Master Controller waits until all 3 threads resolve</div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Controller routes to Quality Gate</span></div>
+
+              <!-- Verifier Gatekeeper -->
+              <div class="flow-step-node" id="hier-step-4" data-step="4">
+                <div class="step-badge badge-orange">CONTROLLER QUALITY GATE</div>
+                <div class="step-card">
+                  <div class="step-title"><span>🛡️</span> Verifier Agent (Cross-Validation)</div>
+                  <div class="step-desc">Controller submits pooled evidence for validation. If gaps found, Controller re-dispatches targeted worker</div>
+                  <div class="conditional-loop-box loop-blue">
+                    <span class="loop-tag">🔄 Controller Re-Dispatch:</span> Master triggers additional targeted worker thread if evidence is incomplete
+                  </div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Controller triggers Reviewer</span></div>
+
+              <!-- Reviewer Node -->
+              <div class="flow-step-node" id="hier-step-5" data-step="5">
+                <div class="step-badge badge-green">ANSWER SYNTHESIS</div>
+                <div class="step-card">
+                  <div class="step-title"><span>✍️</span> Reviewer Agent</div>
+                  <div class="step-desc">Synthesizes multi-threaded findings into final structured response under Controller supervision</div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Final output delivered</span></div>
+
+              <div class="flow-step-node" id="hier-step-6" data-step="6">
+                <div class="step-badge badge-emerald">OUTPUT</div>
+                <div class="step-card">
+                  <div class="step-title"><span>🎯</span> Verified Architectural Answer</div>
+                  <div class="step-desc">Consolidated multi-agent architectural intelligence returned to user</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Architectural Characteristics Grid -->
+            <div class="arch-meta-grid">
+              <div class="arch-meta-card">
+                <div class="meta-label">Control Topology</div>
+                <div class="meta-val">Star / Master-Worker</div>
+                <div class="meta-sub">Central controller commands all subordinate workers</div>
+              </div>
+              <div class="arch-meta-card">
+                <div class="meta-label">Concurrency Strategy</div>
+                <div class="meta-val">Multi-Threaded Pool</div>
+                <div class="meta-sub">Concurrent worker threads execute simultaneously</div>
+              </div>
+              <div class="arch-meta-card">
+                <div class="meta-label">Memory &amp; State</div>
+                <div class="meta-val">Thread-Safe Blackboard</div>
+                <div class="meta-sub">Thread-safe concurrent data aggregation protected by lock</div>
+              </div>
+              <div class="arch-meta-card">
+                <div class="meta-label">Key Trade-off</div>
+                <div class="meta-val">High Parallel Throughput</div>
+                <div class="meta-sub">Faster execution via parallel retrieval; requires thread locking</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!--  3. EVENT-DRIVEN ARCHITECTURE GRAPH                           -->
+        <!-- ============================================================== -->
+        <div class="arch-graph-section" id="section-arch-event_driven">
+          <div class="glass-card arch-graph-card arch-card-purple">
+            <div class="arch-graph-header">
+              <div class="arch-graph-title-group">
+                <span class="arch-graph-icon">⚡</span>
+                <div>
+                  <h3 class="arch-graph-title">3. Event-Driven Architecture</h3>
+                  <span class="arch-graph-subtitle">Reactive Event Bus · Decoupled Pub/Sub Agent Mesh</span>
+                </div>
+              </div>
+              <div class="arch-badge-group">
+                <span class="pill-badge badge-purple">InProcessEventBus</span>
+                <span class="arch-prop-pill">Decoupled Reactive Topics</span>
+              </div>
+            </div>
+
+            <!-- Core Working Principle Banner -->
+            <div class="arch-principle-banner banner-purple">
+              <span class="principle-icon">💡</span>
+              <div class="principle-text">
+                <strong>How It Works:</strong> Agents have <em>zero direct references</em> to one another. Communication occurs exclusively by publishing and subscribing to typed event topics on a central <code>InProcessEventBus</code>. When an event fires (e.g. <code>plan_ready</code>), all subscribed workers react autonomously and concurrently without any direct invocation.
+              </div>
+            </div>
+
+            <!-- Central Event Bus Visual Spine & Flow -->
+            <div class="eventbus-diagram-container" id="flowchart-event_driven">
+
+              <!-- Top: Inbound Event -->
+              <div class="event-stream-row" id="evt-step-0" data-step="0">
+                <div class="event-pill-badge topic-purple">📢 Topic: 'question_received'</div>
+                <div class="event-connector-line"></div>
+                <div class="event-agent-box">
+                  <div class="step-title"><span>🌐</span> Gateway publishes <code>question_received</code></div>
+                  <div class="step-desc">Orchestrator Agent is subscribed to this topic and wakes up</div>
+                </div>
+              </div>
+
+              <!-- Central Event Bus Visual Bar -->
+              <div class="event-bus-spine">
+                <div class="bus-spine-label">
+                  <span>⚡</span> IN-PROCESS EVENT BUS (InProcessEventBus) — Decoupled Pub/Sub Channel
+                </div>
+              </div>
+
+              <!-- Event 1: Plan Ready -->
+              <div class="event-stream-row" id="evt-step-1" data-step="1">
+                <div class="event-agent-box pub-box">
+                  <div class="step-title"><span>🧠</span> Orchestrator Agent (Publisher)</div>
+                  <div class="step-desc">Formulates retrieval plan and publishes <code>plan_ready</code> event to the bus</div>
+                </div>
+                <div class="event-connector-line"></div>
+                <div class="event-pill-badge topic-blue">📢 Topic: 'plan_ready' (Broadcast)</div>
+              </div>
+
+              <!-- Parallel Subscribed Workers Reacting to plan_ready -->
+              <div class="event-subscribers-grid" id="evt-step-workers">
+                <div class="event-sub-card" id="evt-step-2a" data-step="2a">
+                  <div class="sub-header"><span class="badge-blue">SUBSCRIBER 1</span></div>
+                  <div class="step-title"><span>💻</span> Code Analysis Agent</div>
+                  <div class="step-desc">Reacts to <code>plan_ready</code> ➔ Fetches AST code ➔ Publishes <code>evidence_posted</code></div>
+                </div>
+
+                <div class="event-sub-card" id="evt-step-2b" data-step="2b">
+                  <div class="sub-header"><span class="badge-cyan">SUBSCRIBER 2</span></div>
+                  <div class="step-title"><span>📜</span> Git History RAG Agent</div>
+                  <div class="step-desc">Reacts to <code>plan_ready</code> ➔ Fetches commit logs ➔ Publishes <code>evidence_posted</code></div>
+                </div>
+
+                <div class="event-sub-card" id="evt-step-2c" data-step="2c">
+                  <div class="sub-header"><span class="badge-purple">SUBSCRIBER 3</span></div>
+                  <div class="step-title"><span>🪲</span> Issue &amp; PR Extractor</div>
+                  <div class="step-desc">Reacts to <code>plan_ready</code> ➔ Fetches GitHub threads ➔ Publishes <code>evidence_posted</code></div>
+                </div>
+              </div>
+
+              <!-- Event 2: Evidence Posted into State Store -->
+              <div class="event-stream-row" id="evt-step-3" data-step="3">
+                <div class="event-pill-badge topic-amber">📢 Topic: 'evidence_posted'</div>
+                <div class="event-connector-line"></div>
+                <div class="event-agent-box">
+                  <div class="step-title"><span>📋</span> Blackboard Subscriber</div>
+                  <div class="step-desc">Listens to <code>evidence_posted</code> events, gathers chunks, and emits <code>evidence_ready</code> once all workers post</div>
+                </div>
+              </div>
+
+              <!-- Event 3: Verification & Sufficiency Decision -->
+              <div class="event-stream-row" id="evt-step-4" data-step="4">
+                <div class="event-agent-box pub-box">
+                  <div class="step-title"><span>🛡️</span> Verifier Agent (Consumer &amp; Publisher)</div>
+                  <div class="step-desc">Consumes <code>evidence_ready</code>. If insufficient, emits <code>evidence_insufficient</code> (triggers retry event). If approved, emits <code>evidence_approved</code></div>
+                </div>
+                <div class="event-connector-line"></div>
+                <div class="event-pill-badge topic-green">📢 Topic: 'evidence_approved'</div>
+              </div>
+
+              <!-- Event 4: Final Answer Synthesized -->
+              <div class="event-stream-row" id="evt-step-5" data-step="5">
+                <div class="event-agent-box">
+                  <div class="step-title"><span>✍️</span> Reviewer Agent (Subscriber)</div>
+                  <div class="step-desc">Consumes <code>evidence_approved</code>, synthesizes verified report, and publishes <code>answer_complete</code></div>
+                </div>
+                <div class="event-connector-line"></div>
+                <div class="event-pill-badge topic-emerald">📢 Topic: 'answer_complete' ➔ Delivered</div>
+              </div>
+
+            </div>
+
+            <!-- Architectural Characteristics Grid -->
+            <div class="arch-meta-grid">
+              <div class="arch-meta-card">
+                <div class="meta-label">Control Topology</div>
+                <div class="meta-val">Decoupled Pub/Sub Mesh</div>
+                <div class="meta-sub">Event bus handles all routing; zero direct agent references</div>
+              </div>
+              <div class="arch-meta-card">
+                <div class="meta-label">Concurrency Strategy</div>
+                <div class="meta-val">Reactive Asynchronous</div>
+                <div class="meta-sub">Subscribers fire concurrently when event topics trigger</div>
+              </div>
+              <div class="arch-meta-card">
+                <div class="meta-label">Fault Isolation</div>
+                <div class="meta-val">Complete Boundary Isolation</div>
+                <div class="meta-sub">A failure in one agent doesn't crash other subscribers</div>
+              </div>
+              <div class="arch-meta-card">
+                <div class="meta-label">Key Trade-off</div>
+                <div class="meta-val">Maximum Extensibility</div>
+                <div class="meta-sub">New agents can subscribe to topics without touching core engine</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!--  4. WORKFLOW-BASED (DAG) ARCHITECTURE GRAPH                   -->
+        <!-- ============================================================== -->
+        <div class="arch-graph-section" id="section-arch-workflow_dag">
+          <div class="glass-card arch-graph-card arch-card-green">
+            <div class="arch-graph-header">
+              <div class="arch-graph-title-group">
+                <span class="arch-graph-icon">🔀</span>
+                <div>
+                  <h3 class="arch-graph-title">4. Workflow-Based (DAG) Architecture</h3>
+                  <span class="arch-graph-subtitle">Formal State Machine DAG · Fork/Join Barriers &amp; Conditional Edges</span>
+                </div>
+              </div>
+              <div class="arch-badge-group">
+                <span class="pill-badge badge-green">State Machine DAG</span>
+                <span class="arch-prop-pill">Fork / Join Barrier Nodes</span>
+              </div>
+            </div>
+
+            <!-- Core Working Principle Banner -->
+            <div class="arch-principle-banner banner-green">
+              <span class="principle-icon">💡</span>
+              <div class="principle-text">
+                <strong>How It Works:</strong> The execution is modeled as a formal <em>Directed Acyclic Graph</em> state machine. The graph features explicit <strong>Fork Barrier</strong> nodes that branch state into concurrent worker nodes, and a <strong>Join Barrier</strong> node that aggregates outputs. Re-retrieval is executed via a <strong>Conditional Graph Edge</strong> that loops back to retrieval only if evidence is insufficient and round count &lt; 2.
+              </div>
+            </div>
+
+            <!-- Visual Flowchart Diagram -->
+            <div class="flowchart-container" id="flowchart-workflow_dag">
+              <!-- Start State -->
+              <div class="flow-step-node" id="dag-step-0" data-step="0">
+                <div class="step-badge badge-emerald">GRAPH STATE: START</div>
+                <div class="step-card">
+                  <div class="step-title"><span>🟢</span> State Machine Start</div>
+                  <div class="step-desc">Initializes execution state dictionary: <code>{question, round: 1, max_rounds: 2}</code></div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Transition Edge: start ➔ plan_node</span></div>
+
+              <!-- Node 1: Plan Node -->
+              <div class="flow-step-node" id="dag-step-1" data-step="1">
+                <div class="step-badge badge-green">DAG NODE 1 · PLANNER</div>
+                <div class="step-card">
+                  <div class="step-title"><span>🧠</span> Orchestrator Node</div>
+                  <div class="step-desc">Analyzes state dictionary, establishes domain targets, and emits graph execution token</div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Transition Edge: plan_node ➔ fork_barrier</span></div>
+
+              <!-- Fork Barrier Node -->
+              <div class="flow-step-node" id="dag-step-2" data-step="2">
+                <div class="step-badge badge-blue">GRAPH BARRIER: FORK</div>
+                <div class="step-card barrier-card">
+                  <div class="step-title"><span>🔀</span> Parallel Fork Barrier Node</div>
+                  <div class="step-desc">Splits the single state graph token into 3 concurrent parallel execution branch edges</div>
+                </div>
+              </div>
+
+              <!-- Parallel DAG Branches in Horizontal Row -->
+              <div class="dag-branches-row" id="dag-step-branches">
+                <div class="dag-branch-col" id="dag-step-3a" data-step="3a">
+                  <div class="step-badge badge-blue">BRANCH NODE A</div>
+                  <div class="step-card branch-card">
+                    <div class="step-title"><span>💻</span> Code Analysis Node</div>
+                    <div class="step-desc">Executes code parsing branch; returns AST evidence dictionary</div>
+                  </div>
+                </div>
+
+                <div class="dag-branch-col" id="dag-step-3b" data-step="3b">
+                  <div class="step-badge badge-cyan">BRANCH NODE B</div>
+                  <div class="step-card branch-card">
+                    <div class="step-title"><span>📜</span> Git History RAG Node</div>
+                    <div class="step-desc">Executes git log branch; returns commit history dictionary</div>
+                  </div>
+                </div>
+
+                <div class="dag-branch-col" id="dag-step-3c" data-step="3c">
+                  <div class="step-badge badge-purple">BRANCH NODE C</div>
+                  <div class="step-card branch-card">
+                    <div class="step-title"><span>🪲</span> Issue &amp; PR Node</div>
+                    <div class="step-desc">Executes GitHub discussions branch; returns PR evidence dictionary</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">▼</span> <span class="arrow-label">Transition Edges: Branches converge into Join Barrier</span></div>
+
+              <!-- Join Barrier Node -->
+              <div class="flow-step-node" id="dag-step-4" data-step="4">
+                <div class="step-badge badge-blue">GRAPH BARRIER: JOIN</div>
+                <div class="step-card barrier-card">
+                  <div class="step-title"><span>🔗</span> Synchronization Join Barrier Node</div>
+                  <div class="step-desc">Synchronizes all 3 branch states; merges evidence arrays into unified immutable state</div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Transition Edge: join_barrier ➔ verify_node</span></div>
+
+              <!-- Verification Node with Conditional Loop Edge -->
+              <div class="flow-step-node" id="dag-step-5" data-step="5">
+                <div class="step-badge badge-orange">DAG NODE 3 · VERIFICATION GATE</div>
+                <div class="step-card">
+                  <div class="step-title"><span>🛡️</span> Verification Node</div>
+                  <div class="step-desc">Evaluates evidence confidence, completeness, and factual grounding</div>
+                  <div class="conditional-loop-box loop-green">
+                    <span class="loop-tag">🔀 Conditional Graph Edge:</span>
+                    <code>IF (confidence &lt; 0.6) AND (round &lt; 2)</code> ➔ Cycles back to <strong>Fork Barrier</strong> with refined sub-queries.<br>
+                    <code>ELSE</code> ➔ Transitions forward to <strong>Reviewer Node</strong>.
+                  </div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Transition Edge: verify_node ➔ reviewer_node</span></div>
+
+              <!-- Reviewer Node -->
+              <div class="flow-step-node" id="dag-step-6" data-step="6">
+                <div class="step-badge badge-green">DAG NODE 4 · SYNTHESIS</div>
+                <div class="step-card">
+                  <div class="step-title"><span>✍️</span> Reviewer Node</div>
+                  <div class="step-desc">Synthesizes consolidated verified state into final architectural intelligence</div>
+                </div>
+              </div>
+
+              <div class="flow-arrow-down"><span class="arrow-symbol">➔</span> <span class="arrow-label">Transition Edge: reviewer_node ➔ END</span></div>
+
+              <!-- End State -->
+              <div class="flow-step-node" id="dag-step-7" data-step="7">
+                <div class="step-badge badge-emerald">GRAPH STATE: END</div>
+                <div class="step-card">
+                  <div class="step-title"><span>🏁</span> State Machine Terminal (END)</div>
+                  <div class="step-desc">Final architectural response successfully constructed and emitted</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Architectural Characteristics Grid -->
+            <div class="arch-meta-grid">
+              <div class="arch-meta-card">
+                <div class="meta-label">Control Topology</div>
+                <div class="meta-val">Directed Acyclic Graph</div>
+                <div class="meta-sub">Formal node-and-edge state machine structure</div>
+              </div>
+              <div class="arch-meta-card">
+                <div class="meta-label">Concurrency Strategy</div>
+                <div class="meta-val">Fork/Join Synchronization</div>
+                <div class="meta-sub">Explicit barrier nodes regulate parallel split and state merge</div>
+              </div>
+              <div class="arch-meta-card">
+                <div class="meta-label">State Management</div>
+                <div class="meta-val">Immutable State Graph Token</div>
+                <div class="meta-sub">Each node transforms and returns a strictly typed state object</div>
+              </div>
+              <div class="arch-meta-card">
+                <div class="meta-label">Cycle Control</div>
+                <div class="meta-val">Bounded Conditional Edge</div>
+                <div class="meta-sub">Explicit edge conditions guard against non-terminating loops</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ============================================================== -->
+      <!--  COMPARATIVE ARCHITECTURAL MECHANISMS MATRIX                   -->
+      <!-- ============================================================== -->
+      <div class="glass-card" style="margin-top: 26px;">
+        <div class="card-title-row">
+          <h3 class="card-subtitle"><span>📊</span> Coordination Topologies Mechanism Matrix</h3>
+          <span class="pill-badge badge-purple">Comparative Architectural Analysis</span>
+        </div>
+        <p class="section-desc">
+          Systematic structural breakdown comparing how each of the 4 coordination topologies handles concurrency, state persistence, agent communication, and re-retrieval loops:
+        </p>
+
+        <div style="overflow-x: auto;">
+          <table class="ablation-table" id="arch-mechanisms-table">
+            <thead>
+              <tr>
+                <th>Architecture Pattern</th>
+                <th>Control Topology</th>
+                <th>Concurrency Strategy</th>
+                <th>State &amp; Memory Store</th>
+                <th>Communication Protocol</th>
+                <th>Sufficiency / Re-Plan Loop</th>
+                <th>Key Architectural Advantage</th>
+                <th>Best Suited For</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>➡️ Sequential</strong></td>
+                <td><span class="badge-category badge-amber">Linear Pipeline</span></td>
+                <td><span class="mono" style="font-size: 0.76rem;">Single-Thread (Serialized)</span></td>
+                <td>Linear FIFO Blackboard</td>
+                <td>Direct pipeline handoff</td>
+                <td>Linear re-plan loopback</td>
+                <td>100% deterministic &amp; reproducible audit trail</td>
+                <td>Audit-heavy workflows &amp; simple linear dependencies</td>
+              </tr>
+              <tr>
+                <td><strong>🏛️ Hierarchical</strong></td>
+                <td><span class="badge-category badge-blue">Central Controller</span></td>
+                <td><span class="mono" style="font-size: 0.76rem;">ThreadPool Parallel Workers</span></td>
+                <td>Thread-safe Shared Blackboard</td>
+                <td>Controller-to-worker dispatch</td>
+                <td>Controller re-dispatch gate</td>
+                <td>Centralized supervision with parallel retrieval</td>
+                <td>Complex multi-source queries needing central oversight</td>
+              </tr>
+              <tr>
+                <td><strong>⚡ Event-Driven</strong></td>
+                <td><span class="badge-category badge-purple">Reactive Event Bus</span></td>
+                <td><span class="mono" style="font-size: 0.76rem;">Asynchronous Pub/Sub Mesh</span></td>
+                <td>Event topic subscribers</td>
+                <td>InProcessEventBus topics</td>
+                <td>'evidence_insufficient' event</td>
+                <td>Zero direct coupling; maximum modular extensibility</td>
+                <td>Distributed systems &amp; dynamically pluggable agents</td>
+              </tr>
+              <tr>
+                <td><strong>🔀 Workflow-Based (DAG)</strong></td>
+                <td><span class="badge-category badge-green">State Machine DAG</span></td>
+                <td><span class="mono" style="font-size: 0.76rem;">Fork/Join Barrier Nodes</span></td>
+                <td>Immutable State Dictionary</td>
+                <td>Graph transition edges</td>
+                <td>Conditional graph edge cycle</td>
+                <td>Formal mathematical governance &amp; bounded loops</td>
+                <td>Mission-critical production pipelines &amp; complex DAGs</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- ============================================================== -->
+    <!--  PART 4: EVALUATION                                            -->
+    <!-- ============================================================== -->
+    <main id="tab-evaluation" class="tab-content">
+
+      <!-- Ablation & Merging Matrix -->
+      <div class="glass-card">
+        <div class="card-title-row">
+          <h2 class="card-title"><span>📊</span> 8-Way Architecture &amp; Ablation Study Matrix</h2>
+          <span class="pill-badge badge-purple">Systematic Multi-Agent Ablation Study</span>
+        </div>
+        <p class="section-desc">
+          Evaluates the necessity of role isolation across the 6 autonomous agents. Comparing the Full Multi-Agent system against merged agent pairs, ablated specialists, and monolithic baseline:
+        </p>
+
+        <div style="overflow-x: auto;">
+          <table class="ablation-table" id="ablation-matrix-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Configuration</th>
+                <th>Accuracy</th>
+                <th>Precision</th>
+                <th>Recall</th>
+                <th>mAP@50</th>
+                <th>Hallucination</th>
+                <th>Avg Latency</th>
+                <th>Coord. Overhead</th>
+                <th>Key Impact / Observed Failure Mode</th>
+              </tr>
+            </thead>
+            <tbody id="ablation-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 4 Visual Ablation Charts -->
+      <section class="eval-charts-section">
+        <div class="card-title-row">
+          <h3 class="card-subtitle"><span>📈</span> Empirical Ablation Analytics &amp; Visual Trade-Offs</h3>
+          <span class="pill-badge badge-blue">Interactive Visual Analytics</span>
+        </div>
+        <p class="section-desc">
+          Empirical comparison across retrieval accuracy, precision/recall, hallucination trade-offs, compute vs. coordination latency, and holistic architectural capability profiles:
+        </p>
+
+        <div class="eval-charts-grid">
+          <!-- Chart 1: Accuracy & IR Quality Metrics -->
+          <div class="glass-card chart-card">
+            <div class="chart-header">
+              <h4 class="chart-title"><span>📊</span> Retrieval &amp; Accuracy Metrics Comparison</h4>
+              <span class="chart-badge">Grouped Bar</span>
+            </div>
+            <div class="chart-canvas-container">
+              <canvas id="chart-accuracy-metrics"></canvas>
+            </div>
+          </div>
+
+          <!-- Chart 2: Accuracy vs. Hallucination Rate Trade-off -->
+          <div class="glass-card chart-card">
+            <div class="chart-header">
+              <h4 class="chart-title"><span>📉</span> Accuracy vs. Hallucination Rate Trade-Off</h4>
+              <span class="chart-badge">Combo Bar &amp; Line</span>
+            </div>
+            <div class="chart-canvas-container">
+              <canvas id="chart-acc-vs-hallucination"></canvas>
+            </div>
+          </div>
+
+          <!-- Chart 3: Latency & Coordination Overhead Decomposition -->
+          <div class="glass-card chart-card">
+            <div class="chart-header">
+              <h4 class="chart-title"><span>⚡</span> Latency &amp; Coordination Overhead Decomposition (ms)</h4>
+              <span class="chart-badge">Stacked Bar</span>
+            </div>
+            <div class="chart-canvas-container">
+              <canvas id="chart-latency-decomposition"></canvas>
+            </div>
+          </div>
+
+          <!-- Chart 4: Holistic Architecture Radar -->
+          <div class="glass-card chart-card">
+            <div class="chart-header">
+              <h4 class="chart-title"><span>🕸️</span> Multi-Dimensional Architecture Capability Radar</h4>
+              <span class="chart-badge">Radar Spider</span>
+            </div>
+            <div class="chart-canvas-container">
+              <canvas id="chart-architecture-radar"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- Inspect Chunks Dark Modal matching User Screenshot -->
+  <div id="inspect-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-container">
+      <div class="modal-header">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <span class="modal-icon" id="modal-icon">📄</span>
+          <div>
+            <div style="display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;">
+              <h3 class="modal-title" id="modal-title">Source Code & Docs</h3>
+              <span style="color: #64748b;">·</span>
+              <span class="modal-sub" id="modal-sub">CHERIoT-Platform__cheriot-rtos</span>
+            </div>
+            <div class="modal-showing-sub" id="modal-showing-text">Showing 1 to 10 of 2,029 items</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <input type="text" id="modal-filter-input" class="modal-filter-input" placeholder="Filter in current page..." oninput="filterModalCurrentPage()">
+          <button class="modal-close-btn" onclick="closeInspectModal()">Close ×</button>
+        </div>
+      </div>
+      <div class="modal-body" id="modal-body">
+        <!-- Chunks list rendered dynamically -->
+      </div>
+      <div class="modal-footer" id="modal-footer">
+        <button class="modal-nav-btn" id="modal-btn-prev" onclick="goToModalPage(currentModalPage - 1)">
+          ← Previous 10
+        </button>
+        <span class="modal-page-indicator" id="modal-page-indicator">
+          Page 1 of 203
+        </span>
+        <button class="modal-nav-btn" id="modal-btn-next" onclick="goToModalPage(currentModalPage + 1)">
+          Next 10 →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/chart.umd.js"></script>
+  <script src="/static/app.js?v=18"></script>
+</body>
+</html>

@@ -7,4 +7,6 @@
     baselines.py    configuration A (no context) and B (code snapshot only)
     llm.py          judge / answer model resolution (shared rag.llm, Gemini, OpenAI-compatible, mock)
     spot_check.py   manual spot-check export and judge-vs-human agreement (Cohen's kappa)
+    ablation_cases  architectural ablation & merged-agent configurations
 """
+from evaluation.ablation_cases import CASE_DEFINITIONS, run_ablation_case

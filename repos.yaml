@@ -1,0 +1,11 @@
+defaults:
+  max_commits: 3000
+  max_issues: 500
+  max_prs: 400
+repos:
+- github: seL4/seL4
+- github: actualbudget/actual
+- github: KDE/kio
+- github: CHERIoT-Platform/cheriot-rtos
+- github: infiniflow/ragflow
+- github: parulaggarwal23/PolicyPal-AI
