@@ -1,5 +1,4 @@
-"""Answering pipeline for the three experimental conditions (+ ablation), runnable through ReadMind's
-native pipeline or the LangChain / LlamaIndex engines in rag/frameworks/."""
+"""Answering pipeline for the three experimental conditions (+ ablation) using ReadMind's native pipeline."""
 import time
 
 from config import LLM_MODEL, LLM_PROVIDER, TOP_K_FINAL
@@ -45,14 +44,11 @@ def format_evidence(evidence: list[dict], max_chars=1800) -> str:
 
 ENGINES = {
     "native": "ReadMind native pipeline",
-    "langchain": "LangChain (LCEL chain over the ReadMind retriever)",
-    "llamaindex": "LlamaIndex (RetrieverQueryEngine over the ReadMind retriever)",
 }
 
 
 def build_result(slug, question, condition, answer, evidence, timings, t0, t1, t2, engine="native") -> dict:
-    """Package an answer into the response shape the API, UI and evaluation all expect.
-    Shared by the native pipeline and the LangChain / LlamaIndex engines so results are comparable."""
+    """Package an answer into the response shape the API, UI and evaluation all expect."""
     spec = ALL_CONDITIONS[condition]
     evidence_cleaned = [{**{k2: v for k2, v in e.items() if k2 != "text"}, "snippet": e["text"][:500]}
                         for e in evidence]
@@ -81,7 +77,7 @@ def build_result(slug, question, condition, answer, evidence, timings, t0, t1, t
 
 
 def get_index(slug):
-    """Imported lazily so this module (and the framework engines) load without chromadb in CI."""
+    """Imported lazily so this module loads without chromadb in CI."""
     from rag.retriever import get_index as _get_index
     return _get_index(slug)
 
@@ -92,12 +88,6 @@ def answer_question(slug: str, question: str, condition: str = "full_history", k
         raise ValueError(f"Unknown condition '{condition}'")
     if engine not in ENGINES:
         raise ValueError(f"Unknown engine '{engine}'. Choose one of: {', '.join(ENGINES)}")
-    if engine == "langchain":
-        from rag.frameworks.langchain_rag import answer_with_langchain
-        return answer_with_langchain(slug, question, condition, k)
-    if engine == "llamaindex":
-        from rag.frameworks.llamaindex_rag import answer_with_llamaindex
-        return answer_with_llamaindex(slug, question, condition, k)
 
     spec = ALL_CONDITIONS[condition]
     index = get_index(slug)

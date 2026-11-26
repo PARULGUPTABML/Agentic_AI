@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: readmind-agentic-ai
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: EMBED_MODEL
+        value: hash
+      - key: USE_RERANKER
+        value: "false"
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: LLM_MODEL
+        value: gemini-2.0-flash
+      - key: GEMINI_API_KEY
+        sync: false   # set this in Render dashboard
+      - key: PYTHON_VERSION
+        value: "3.12.0"

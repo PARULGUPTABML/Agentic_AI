@@ -33,3 +33,5 @@ agent_trace.json
 data/
 results/
 
+data/repos/
+data/cache/

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ReadMind — Multi-Agent Architecture Intelligence</title>
-  <link rel="stylesheet" href="/static/style.css?v=16">
+  <link rel="stylesheet" href="/static/style.css?v=17">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -251,8 +251,12 @@
       <!-- Query Prompt Box Matching Screenshot -->
       <section class="ask-main-box">
         <div class="ask-textarea-wrapper">
-          <textarea class="ask-textarea" id="question-input" rows="3" placeholder='Ask why the code is the way it is... e.g. "Why does login rotate the session id?"'></textarea>
+          <textarea class="ask-textarea" id="question-input" rows="3"
+            placeholder='Ask why the code is the way it is... e.g. "Why does login rotate the session id?"'
+            oninput="onQuestionInput()"></textarea>
         </div>
+        <!-- Inline Guardrail Banner — appears as you type -->
+        <div id="inline-guardrail-banner" style="display:none;" class="inline-gr-banner"></div>
 
         <!-- Horizontal Controls Bar: Evaluation/Ablation Modes on Left, Ask Button on Right -->
         <div class="ask-controls-bar">
@@ -348,6 +352,14 @@
           </div>
         </div>
 
+        <!-- Hallucination Rejection Demo -->
+        <div class="hallucination-demo-row">
+          <span class="hall-demo-label">🔥 Hallucination Tests:</span>
+          <button class="hall-demo-btn" onclick="runHallucinationTest('sel4')">seL4: Kyber crypto?</button>
+          <button class="hall-demo-btn" onclick="runHallucinationTest('cheriot')">CHERIoT: Kubernetes?</button>
+          <button class="hall-demo-btn" onclick="runHallucinationTest('ragflow')">RAGFlow: Solana wallet?</button>
+        </div>
+
         <!-- Preset Suggestion Chips (Screenshot Row 3) -->
         <div class="preset-chips-row">
           <div class="preset-chip-pill" onclick="setQuestionText('Why was the authentication logic implemented this way?')">
@@ -414,6 +426,64 @@
         </section>
 
       </div>
+
+      <!-- ============================================================== -->
+      <!--  LIVE AGENT TRACE PANEL                                        -->
+      <!-- ============================================================== -->
+      <section class="glass-card viva-panel" id="live-trace-panel" style="display:none; margin-top:24px;">
+        <div class="card-title-row">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:1.2rem;">⚡</span>
+            <h3 style="margin:0;font-size:1rem;font-weight:600;color:#f1f5f9;">Live Agent Execution Trace</h3>
+            <span class="pill-badge badge-green" id="trace-status-badge">Running…</span>
+          </div>
+          <span style="font-size:0.8rem;color:#64748b;">Real-time step log · timestamps · per-agent timing</span>
+        </div>
+        <div id="live-trace-log" class="live-trace-log"></div>
+        <div class="trace-summary-row" id="trace-summary-row" style="display:none;">
+          <div class="trace-summary-item"><span class="ts-label">Total Steps</span><span class="ts-val" id="ts-steps">—</span></div>
+          <div class="trace-summary-item"><span class="ts-label">Total Time</span><span class="ts-val" id="ts-total">—</span></div>
+          <div class="trace-summary-item"><span class="ts-label">Agents</span><span class="ts-val" id="ts-agents">—</span></div>
+          <div class="trace-summary-item"><span class="ts-label">Evidence Collected</span><span class="ts-val" id="ts-evidence">—</span></div>
+        </div>
+      </section>
+
+      <!-- ============================================================== -->
+      <!--  PER-AGENT LATENCY CHART                                       -->
+      <!-- ============================================================== -->
+      <section class="glass-card viva-panel" id="latency-chart-panel" style="display:none; margin-top:24px;">
+        <div class="card-title-row">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:1.2rem;">📊</span>
+            <h3 style="margin:0;font-size:1rem;font-weight:600;color:#f1f5f9;">Per-Agent Latency Breakdown</h3>
+            <span class="pill-badge badge-blue" id="latency-arch-badge">Sequential</span>
+          </div>
+          <span style="font-size:0.8rem;color:#64748b;">Execution time per agent (ms)</span>
+        </div>
+        <div style="position:relative;height:220px;padding:8px 0;">
+          <canvas id="latency-bar-chart"></canvas>
+        </div>
+        <div class="latency-legend" id="latency-legend"></div>
+      </section>
+
+      <!-- ============================================================== -->
+      <!-- ============================================================== -->
+      <!--  A2A CONNECTION STATUS WIDGET                                  -->
+      <!-- ============================================================== -->
+      <section class="glass-card viva-panel" id="a2a-status-panel" style="margin-top:24px;">
+        <div class="card-title-row">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:1.2rem;">🔗</span>
+            <h3 style="margin:0;font-size:1rem;font-weight:600;color:#f1f5f9;">A2A Agent Connections</h3>
+            <span class="pill-badge badge-purple">ADK ↔ CrewAI Interop</span>
+          </div>
+          <button class="btn-refresh-a2a" onclick="loadA2AStatus()">↻ Refresh</button>
+        </div>
+        <p style="font-size:0.82rem;color:#94a3b8;margin:0 0 14px;">Live status of Agent-to-Agent (A2A) protocol connections between Google ADK and CrewAI frameworks.</p>
+        <div class="a2a-grid" id="a2a-grid">
+          <!-- Populated by loadA2AStatus() -->
+        </div>
+      </section>
 
     </main>
 
@@ -1293,6 +1363,6 @@
   </div>
 
   <script src="/static/chart.umd.js"></script>
-  <script src="/static/app.js?v=18"></script>
+  <script src="/static/app.js?v=20"></script>
 </body>
 </html>

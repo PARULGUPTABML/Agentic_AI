@@ -32,7 +32,7 @@ def _call(provider, model, system, prompt, temperature, json_mode):
         
         # Build candidate list with primary model first, followed by resilient fallbacks
         candidates = [model]
-        for fb in ("gemini-3.5-flash-lite", "gemini-3-flash-preview", "gemini-3.5-flash"):
+        for fb in ("gemini-3-flash-preview", "gemini-flash-latest", "gemini-2.5-flash"):
             if fb not in candidates:
                 candidates.append(fb)
                 

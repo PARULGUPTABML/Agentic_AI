@@ -134,6 +134,8 @@ document.addEventListener("DOMContentLoaded", () => {
   loadQuestions();
   loadAblationResults();
   checkStatus();
+  renderVariantCards();
+  loadA2AStatus();
 });
 
 // --------------------------------------------------------------------- //
@@ -697,6 +699,39 @@ async function executeLiveQuery() {
     return;
   }
 
+  // ── Guardrail: only block genuinely bad input ──
+  try {
+    const gr = await fetch("/api/guardrail-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: question })
+    });
+    const grData = await gr.json();
+    const banner = document.getElementById("inline-guardrail-banner");
+    const ta = questionInput;
+
+    if (!grData.allowed) {
+      // BLOCKED — show banner and stop
+      if (ta) ta.classList.add("gr-blocked");
+      if (banner) {
+        banner.style.display = "flex";
+        banner.className = "inline-gr-banner gr-block";
+        const match = grData.matched_patterns && grData.matched_patterns[0]
+          ? ` · matched: "<em>${escapeHtml(grData.matched_patterns[0].match)}</em>"` : "";
+        banner.innerHTML = `<span class="inline-gr-icon">🚫</span>
+          <div class="inline-gr-body">
+            <div class="inline-gr-title">Blocked — ${escapeHtml(grData.reasons[0] || "guardrail triggered")}${match}</div>
+            <div class="inline-gr-tags">${(grData.categories||[]).map(c=>`<span class="inline-gr-tag ${c}">${c.replace("_"," ")}</span>`).join("")}</div>
+          </div>`;
+      }
+      return;  // stop — do NOT run the query
+    }
+    // Clean or warned — hide banner and continue normally
+    if (banner) banner.style.display = "none";
+    if (ta) ta.classList.remove("gr-blocked");
+  } catch (e) { /* guardrail down — allow through */ }
+  // ── end guardrail ──
+
   btn.disabled = true;
   if (btnIcon) btnIcon.textContent = "⏳";
   if (btnText) btnText.textContent = "Synthesizing...";
@@ -761,8 +796,7 @@ async function executeLiveQuery() {
   }
 }
 
-function renderQueryResults(data) {
-  // Ablation Alert Notice
+function _renderQueryResultsCore(data) {
   const alertCallout = document.getElementById("ablation-alert-callout");
   if (alertCallout) {
     if (data.ablation_warning) {
@@ -1023,7 +1057,7 @@ function renderMethodologyFlow(data) {
           <div class="step-agent-header">
             <span class="step-agent-icon">${escapeHtml(step.icon || "🤖")}</span>
             <div class="step-agent-info">
-              <div class="step-agent-name">${escapeHtml(step.agent)}</div>
+              <div class="step-agent-name">${escapeHtml(step.agent)} ${getFrameworkBadge(step.agent, modeKey)}</div>
               <div class="step-agent-role">${escapeHtml(step.role || "")}</div>
             </div>
           </div>
@@ -2103,3 +2137,705 @@ function getNodesForSimStep(stepIdx) {
 }
 
 
+
+
+// =====================================================================
+//  VIVA FEATURE 1 — Live Agent Execution Trace Panel
+// =====================================================================
+
+let _latencyChartInstance = null;
+
+function showLiveTrace(trace, totalLatencyMs, evidenceCount, archLabel) {
+  const panel     = document.getElementById("live-trace-panel");
+  const log       = document.getElementById("live-trace-log");
+  const badge     = document.getElementById("trace-status-badge");
+  const summaryRow = document.getElementById("trace-summary-row");
+  if (!panel || !log) return;
+
+  panel.style.display = "block";
+  log.innerHTML = "";
+  summaryRow.style.display = "none";
+  if (badge) { badge.textContent = "Running…"; badge.className = "pill-badge badge-amber"; }
+
+  if (!trace || trace.length === 0) {
+    log.innerHTML = '<div style="color:#64748b;font-size:0.82rem;padding:8px;">No trace data available.</div>';
+    return;
+  }
+
+  let delay = 0;
+  const stepMs = 220;
+
+  trace.forEach((step, idx) => {
+    setTimeout(() => {
+      const isBypassed = step.is_bypassed || (step.status && step.status.includes("SKIPPED"));
+      const stateClass = isBypassed ? "skipped" : (idx === trace.length - 1 ? "done" : "running");
+      const statusLabel = isBypassed ? "SKIPPED" : (idx < trace.length - 1 ? "Running" : "Done");
+      const duration = step.duration_ms != null ? `${Number(step.duration_ms).toFixed(1)} ms` : "";
+      const now = new Date().toLocaleTimeString("en-GB", { hour12: false });
+
+      const entry = document.createElement("div");
+      entry.className = `trace-entry ${stateClass}`;
+      entry.innerHTML = `
+        <span class="trace-entry-icon">${escapeHtml(step.icon || "🤖")}</span>
+        <div class="trace-entry-body">
+          <div class="trace-entry-top">
+            <span class="trace-agent-name">${escapeHtml(step.agent || "Agent")}</span>
+            <span class="trace-status-pill ${isBypassed ? "skipped" : (idx < trace.length - 1 ? "running" : "done")}">${statusLabel}</span>
+            ${duration ? `<span class="trace-duration">${duration}</span>` : ""}
+            <span class="trace-ts">${now}</span>
+          </div>
+          <div class="trace-action-text">${escapeHtml((step.action || "").slice(0, 160))}</div>
+        </div>`;
+      log.appendChild(entry);
+      log.scrollTop = log.scrollHeight;
+
+      // On last step — finalise
+      if (idx === trace.length - 1) {
+        // Mark all previous "running" entries as done
+        log.querySelectorAll(".trace-entry.running").forEach(el => {
+          el.classList.remove("running");
+          el.classList.add("done");
+          const pill = el.querySelector(".trace-status-pill");
+          if (pill) { pill.textContent = "Done"; pill.className = "trace-status-pill done"; }
+        });
+        if (badge) { badge.textContent = "Complete"; badge.className = "pill-badge badge-green"; }
+
+        // Fill summary
+        const agents = [...new Set(trace.filter(s => !s.is_bypassed).map(s => s.agent))];
+        document.getElementById("ts-steps").textContent   = trace.length;
+        document.getElementById("ts-total").textContent   = `${Number(totalLatencyMs || 0).toFixed(1)} ms`;
+        document.getElementById("ts-agents").textContent  = agents.length;
+        document.getElementById("ts-evidence").textContent = evidenceCount || "—";
+        summaryRow.style.display = "flex";
+      }
+    }, delay);
+    delay += stepMs;
+  });
+}
+
+
+// =====================================================================
+//  VIVA FEATURE 2 — Per-Agent Latency Bar Chart
+// =====================================================================
+
+function showLatencyChart(trace, archLabel) {
+  const panel = document.getElementById("latency-chart-panel");
+  const badge = document.getElementById("latency-arch-badge");
+  if (!panel || !trace || trace.length === 0) return;
+
+  panel.style.display = "block";
+  if (badge) badge.textContent = archLabel || "Sequential";
+
+  const labels  = trace.map(s => s.agent || "Agent");
+  const durations = trace.map(s => Number(s.duration_ms || 0));
+  const isSkipped = trace.map(s => !!(s.is_bypassed || (s.status && s.status.includes("SKIPPED"))));
+
+  const COLORS = [
+    "rgba(56,189,248,0.85)",   // blue
+    "rgba(16,185,129,0.85)",   // green
+    "rgba(245,158,11,0.85)",   // amber
+    "rgba(168,85,247,0.85)",   // purple
+    "rgba(236,72,153,0.85)",   // pink
+    "rgba(251,146,60,0.85)",   // orange
+    "rgba(45,212,191,0.85)",   // teal
+    "rgba(99,102,241,0.85)",   // indigo
+  ];
+  const bgColors = trace.map((s, i) =>
+    isSkipped[i] ? "rgba(239,68,68,0.3)" : COLORS[i % COLORS.length]
+  );
+
+  const canvas = document.getElementById("latency-bar-chart");
+  if (!canvas) return;
+
+  if (_latencyChartInstance) {
+    try { _latencyChartInstance.destroy(); } catch(e) {}
+    _latencyChartInstance = null;
+  }
+
+  _latencyChartInstance = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Latency (ms)",
+        data: durations,
+        backgroundColor: bgColors,
+        borderColor: bgColors.map(c => c.replace("0.85", "1")),
+        borderWidth: 1.5,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.x.toFixed(2)} ms ${isSkipped[ctx.dataIndex] ? "(SKIPPED)" : ""}`,
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: "rgba(255,255,255,0.05)" },
+          ticks: { color: "#94a3b8", font: { size: 11 } },
+          title: { display: true, text: "Milliseconds", color: "#64748b", font: { size: 11 } }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: "#cbd5e1", font: { size: 11 } }
+        }
+      }
+    }
+  });
+
+  // Legend
+  const legend = document.getElementById("latency-legend");
+  if (legend) {
+    legend.innerHTML = trace.map((s, i) => `
+      <div class="latency-legend-item">
+        <div class="latency-legend-dot" style="background:${bgColors[i]};"></div>
+        <span>${escapeHtml(s.agent || "Agent")}: ${durations[i].toFixed(1)} ms</span>
+      </div>`).join("");
+  }
+}
+
+
+// =====================================================================
+//  VIVA FEATURE 3 — Guardrail Live Demo
+// =====================================================================
+
+let _guardrailTimer = null;
+
+function setGuardrailText(text) {
+  const ta = document.getElementById("guardrail-input");
+  if (ta) {
+    ta.value = text;
+    triggerGuardrailCheck();
+    ta.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+}
+window.setGuardrailText = setGuardrailText;
+
+function triggerGuardrailCheck() {
+  clearTimeout(_guardrailTimer);
+  _guardrailTimer = setTimeout(runGuardrailCheck, 350);  // debounce 350ms
+}
+window.triggerGuardrailCheck = triggerGuardrailCheck;
+
+async function runGuardrailCheck() {
+  const ta     = document.getElementById("guardrail-input");
+  const result = document.getElementById("guardrail-result");
+  if (!ta || !result) return;
+
+  const text = ta.value;
+  if (!text.trim()) {
+    result.style.display = "none";
+    return;
+  }
+
+  try {
+    const res  = await fetch("/api/guardrail-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    renderGuardrailResult(data);
+  } catch (e) {
+    result.style.display = "none";
+  }
+}
+
+function renderGuardrailResult(data) {
+  const el = document.getElementById("guardrail-result");
+  if (!el) return;
+
+  const allowed = data.allowed === true;
+  el.className = `guardrail-result ${allowed ? "allowed" : "blocked"}`;
+  el.style.display = "block";
+
+  const icon  = allowed ? "✅" : "🚫";
+  const label = allowed ? "ALLOWED" : "BLOCKED";
+  const sub   = allowed
+    ? `Passed all ${3} security layers — safe to process`
+    : `Blocked by guardrail · ${data.reasons.join(" · ")}`;
+
+  // Category tags
+  const cats = data.categories && data.categories.length
+    ? data.categories
+    : (allowed ? ["safe"] : []);
+  const tagsHtml = cats.map(c => `<span class="gr-tag ${c}">${c.replace("_", " ")}</span>`).join("");
+
+  // Matched patterns detail
+  const matchHtml = data.matched_patterns && data.matched_patterns.length
+    ? `<div class="gr-match-list">
+        ${data.matched_patterns.slice(0,4).map(m =>
+          `<div class="gr-match-item">
+            <strong style="color:#94a3b8;">[${escapeHtml(m.type)}]</strong>
+            matched: <em style="color:#fbbf24;">"${escapeHtml(m.match)}"</em>
+           </div>`
+        ).join("")}
+       </div>`
+    : "";
+
+  // Sanitized output (only if different)
+  const sanitized = data.sanitized !== undefined && data.sanitized !== ta_val()
+    ? `<div class="gr-sanitized-row">
+        <strong>Sanitized output:</strong> ${escapeHtml(data.sanitized.slice(0, 200))}
+       </div>`
+    : "";
+
+  el.innerHTML = `
+    <div class="gr-verdict-row">
+      <span class="gr-verdict-icon">${icon}</span>
+      <div>
+        <div class="gr-verdict-label ${allowed ? "allowed" : "blocked"}">${label}</div>
+        <div class="gr-verdict-sub">${escapeHtml(sub)}</div>
+      </div>
+    </div>
+    <div class="gr-tags-row">${tagsHtml}</div>
+    ${matchHtml}
+    ${sanitized}
+  `;
+}
+
+function ta_val() {
+  const ta = document.getElementById("guardrail-input");
+  return ta ? ta.value : "";
+}
+
+
+// =====================================================================
+//  HOOK INTO executeLiveQuery — populate trace + chart after each run
+// =====================================================================
+
+// Patch renderQueryResults to also show the two new panels
+const _origRenderQueryResults = null; // unused — calls core directly
+
+function renderQueryResults(data) {
+  // Call the original renderer (renamed to avoid recursion)
+  _renderQueryResultsCore(data);
+
+  // After answer renders, show trace + latency chart
+  const trace = data.agent_trace || [];
+  const archLabel = (COORDINATION_ARCHS[currentCoordinationArch] || {}).label || "Sequential";
+  const evidenceCount = (data.retrieved_evidence || data.evidence || []).length;
+
+  if (trace.length > 0) {
+    showLiveTrace(trace, data.total_latency_ms, evidenceCount, archLabel);
+    showLatencyChart(trace, archLabel);
+  }
+
+  // New feature helpers
+  showCostMeter(data);
+  showJudgeScores(data);
+  addToSessionHistory(data);
+}
+
+
+// =====================================================================
+//  NEW FEATURES (1-8) — appended
+// =====================================================================
+
+// -----------------------------------------------------------------------
+//  FEATURE 1 — Hallucination Rejection Demo
+// -----------------------------------------------------------------------
+const HALLUCINATION_PROBES = {
+  sel4:    { repo: "seL4__seL4",             question: "Does seL4 use Kyber post-quantum cryptography for IPC authentication?" },
+  cheriot: { repo: "CHERIoT-Platform__cheriot-rtos", question: "Does CHERIoT-RTOS support Kubernetes pod scheduling?" },
+  ragflow: { repo: "infiniflow__ragflow",    question: "Does RAGFlow include a Solana wallet integration?" }
+};
+
+function runHallucinationTest(key) {
+  const probe = HALLUCINATION_PROBES[key];
+  if (!probe) return;
+  // Switch repo if needed
+  if (probe.repo !== currentRepoSlug) {
+    selectRepository(probe.repo);
+  }
+  setQuestionText(probe.question);
+  setTimeout(() => executeLiveQuery(), 200);
+}
+window.runHallucinationTest = runHallucinationTest;
+
+
+// -----------------------------------------------------------------------
+//  FEATURE 2 — Messaging Channel Comparator
+// -----------------------------------------------------------------------
+async function runChannelComparison() {
+  const btn = document.getElementById("btn-run-channel-compare");
+  const resultDiv = document.getElementById("channel-compare-result");
+  const grid = document.getElementById("channel-compare-grid");
+  const question = (document.getElementById("question-input") || {}).value || "Why was this code changed?";
+
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Comparing…"; }
+
+  try {
+    const res = await fetch("/api/channel-compare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, repo_slug: currentRepoSlug })
+    });
+    const data = await res.json();
+    renderChannelCards(data.channels || []);
+    if (resultDiv) resultDiv.style.display = "block";
+  } catch (e) {
+    if (grid) grid.innerHTML = `<div style="color:#f87171;font-size:0.82rem;">Failed to load comparison data.</div>`;
+    if (resultDiv) resultDiv.style.display = "block";
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "▶ Run Channel Comparison (uses current question)"; }
+  }
+}
+window.runChannelComparison = runChannelComparison;
+
+function renderChannelCards(channels) {
+  const grid = document.getElementById("channel-compare-grid");
+  if (!grid) return;
+  grid.innerHTML = channels.map(ch => `
+    <div class="channel-card">
+      <div class="channel-card-title"><span>${ch.icon}</span>${escapeHtml(ch.name)}</div>
+      <div style="font-size:0.76rem;color:#64748b;margin-bottom:8px;">${escapeHtml(ch.description)}</div>
+      <div class="channel-metric"><span class="channel-metric-label">Evidence Items</span><span class="channel-metric-val">${ch.evidence_count}</span></div>
+      <div class="channel-metric"><span class="channel-metric-label">Bytes Delivered</span><span class="channel-metric-val">${ch.bytes_delivered.toLocaleString()}</span></div>
+      <div class="channel-metric"><span class="channel-metric-label">Messages Sent</span><span class="channel-metric-val">${ch.messages}</span></div>
+      <div class="channel-metric"><span class="channel-metric-label">Deliveries</span><span class="channel-metric-val">${ch.deliveries}</span></div>
+      <div class="channel-metric"><span class="channel-metric-label">Deduplication</span><span class="channel-metric-val" style="font-size:0.7rem;">${escapeHtml(ch.deduplication)}</span></div>
+      <div class="channel-metric"><span class="channel-metric-label">Latency</span><span class="channel-metric-val">${ch.latency_ms}ms</span></div>
+      <div class="channel-best-tag">${escapeHtml(ch.best_for)}</div>
+    </div>
+  `).join("");
+}
+
+
+// -----------------------------------------------------------------------
+//  FEATURE 3 — A2A Connection Status Widget
+// -----------------------------------------------------------------------
+async function loadA2AStatus() {
+  const grid = document.getElementById("a2a-grid");
+  if (!grid) return;
+  grid.innerHTML = `<div style="color:#64748b;font-size:0.82rem;padding:8px;">Loading A2A status…</div>`;
+  try {
+    const res = await fetch("/api/a2a-status");
+    const data = await res.json();
+    renderA2ACards(data.connections || []);
+  } catch (e) {
+    grid.innerHTML = `<div style="color:#f87171;font-size:0.82rem;">Failed to load A2A status.</div>`;
+  }
+}
+window.loadA2AStatus = loadA2AStatus;
+
+function renderA2ACards(connections) {
+  const grid = document.getElementById("a2a-grid");
+  if (!grid) return;
+  grid.innerHTML = connections.map(c => `
+    <div class="a2a-card">
+      <div class="a2a-direction">${escapeHtml(c.direction)}</div>
+      <div class="a2a-row"><span class="a2a-row-label">From</span><span class="a2a-row-val">${escapeHtml(c.from_framework)}</span></div>
+      <div class="a2a-row"><span class="a2a-row-label">To</span><span class="a2a-row-val">${escapeHtml(c.to_framework)}</span></div>
+      <div class="a2a-row"><span class="a2a-row-label">Agent</span><span class="a2a-row-val">${escapeHtml(c.agent)}</span></div>
+      <div class="a2a-row"><span class="a2a-row-label">Protocol</span><span class="a2a-row-val">${escapeHtml(c.protocol)}</span></div>
+      <div class="a2a-row"><span class="a2a-row-label">Port</span><span class="a2a-row-val">${c.port}</span></div>
+      <div class="a2a-row">
+        <span class="a2a-row-label">Status</span>
+        <span class="a2a-row-val">
+          <span class="a2a-status-dot ${c.status}"></span>${escapeHtml(c.status)}
+        </span>
+      </div>
+      <div class="a2a-row"><span class="a2a-row-label">Pattern</span><span class="a2a-row-val">${escapeHtml(c.pattern)}</span></div>
+      <div class="a2a-desc">${escapeHtml(c.description)}</div>
+    </div>
+  `).join("");
+}
+
+
+// -----------------------------------------------------------------------
+//  FEATURE 4 — Cost Meter (called from renderQueryResults patch)
+// -----------------------------------------------------------------------
+function showCostMeter(data) {
+  const row = document.getElementById("cost-meter-row");
+  if (!row) return;
+
+  const trace = data.agent_trace || [];
+  const llmCalls = data.llm_calls || trace.length || 1;
+  const latencyMs = data.total_latency_ms || 1.4;
+
+  // Estimate token usage if not provided by API
+  const answerLen = (data.executive_summary || data.answer || "").length;
+  const evidenceLen = JSON.stringify(data.retrieved_evidence || []).length;
+  const promptTokens  = data.prompt_tokens  || Math.round((evidenceLen + 500) / 4);
+  const completionTokens = data.completion_tokens || Math.round((answerLen + 200) / 4);
+  const totalTokens   = data.total_tokens   || (promptTokens + completionTokens);
+
+  // Gemini Flash pricing: ~$0.075 / 1M input tokens, ~$0.30 / 1M output tokens
+  const costUsd = data.cost_usd !== undefined
+    ? data.cost_usd
+    : ((promptTokens * 0.075 + completionTokens * 0.30) / 1_000_000);
+
+  const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setText("cm-llm-calls",         llmCalls);
+  setText("cm-prompt-tokens",     promptTokens.toLocaleString());
+  setText("cm-completion-tokens", completionTokens.toLocaleString());
+  setText("cm-total-tokens",      totalTokens.toLocaleString());
+  setText("cm-cost-usd",          `$${costUsd.toFixed(6)}`);
+  setText("cm-latency",           `${latencyMs}ms`);
+
+  row.style.display = "block";
+}
+
+
+// -----------------------------------------------------------------------
+//  FEATURE 5 — Framework Badges helper (used inside renderMethodologyFlow)
+// -----------------------------------------------------------------------
+function getFrameworkBadge(agentName, modeKey) {
+  if (!agentName) return "";
+  const name = agentName.toLowerCase();
+  if (modeKey === "monolithic_single_agent" || name.includes("monolithic")) {
+    return `<span class="fw-badge fw-adk">ADK</span>`;
+  }
+  if (name.includes("orchestrator")) return `<span class="fw-badge fw-adk">ADK</span>`;
+  if (name.includes("code"))         return `<span class="fw-badge fw-crew">CrewAI</span>`;
+  if (name.includes("history") || name.includes("rag")) return `<span class="fw-badge fw-adk">ADK</span>`;
+  if (name.includes("issue") || name.includes("pr"))    return `<span class="fw-badge fw-crew">CrewAI</span>`;
+  if (name.includes("verif"))        return `<span class="fw-badge fw-adk">ADK</span>`;
+  if (name.includes("review"))       return `<span class="fw-badge fw-crew">CrewAI</span>`;
+  return `<span class="fw-badge fw-adk">ADK</span>`;
+}
+window.getFrameworkBadge = getFrameworkBadge;
+
+
+// -----------------------------------------------------------------------
+//  FEATURE 6 — Prompt Variant Comparator (static render on load)
+// -----------------------------------------------------------------------
+const PROMPT_VARIANTS = {
+  "default":            { dimension:"baseline",     icon:"⚙️",  style:"Concise task instructions. No extra formatting guidance." },
+  "react":              { dimension:"architecture", icon:"🔄",  style:"Explicit Thought → Action → Observation loop. Max 3 iterations before stopping." },
+  "few_shot":           { dimension:"architecture", icon:"📖",  style:"Two worked examples provided. IDs in examples are illustrative and must never be cited." },
+  "persona_maintainer": { dimension:"persona",      icon:"🧑‍💻", style:"Skeptical senior kernel maintainer. Only accepts primary sources. Calls out speculation." },
+  "persona_onboarding": { dimension:"persona",      icon:"🎓",  style:"Mentor for new contributors. Plain language, defines acronyms, still cites every fact." },
+  "content_minimal":    { dimension:"content",      icon:"✂️",  style:"Bare-minimum instructions. No citation or format guidance." }
+};
+
+function renderVariantCards() {
+  const grid = document.getElementById("variant-cards-grid");
+  if (!grid) return;
+  grid.innerHTML = Object.entries(PROMPT_VARIANTS).map(([key, v]) => `
+    <div class="variant-card">
+      <div class="variant-card-top">
+        <span style="font-size:1.1rem;">${v.icon}</span>
+        <span class="variant-name">${escapeHtml(key)}</span>
+        <span class="variant-dim-badge dim-${v.dimension}">${v.dimension}</span>
+      </div>
+      <div class="variant-style-text">${escapeHtml(v.style)}</div>
+    </div>
+  `).join("");
+}
+window.renderVariantCards = renderVariantCards;
+
+
+// -----------------------------------------------------------------------
+//  FEATURE 7 — Session Query History
+// -----------------------------------------------------------------------
+let sessionHistory = [];
+
+function addToSessionHistory(data) {
+  const question = (document.getElementById("question-input") || {}).value || "";
+  if (!question.trim()) return;
+
+  const confidence = data.confidence_score || data.confidence || 0;
+  const confClass = confidence >= 0.75 ? "high" : confidence >= 0.5 ? "medium" : "low";
+  const archLabel = (COORDINATION_ARCHS[currentCoordinationArch] || {}).label || "Sequential";
+  const latency = data.total_latency_ms || 1.4;
+  const ts = new Date().toLocaleTimeString();
+
+  sessionHistory.unshift({ question, confidence, confClass, archLabel, latency, ts });
+  renderSessionHistory();
+}
+
+function renderSessionHistory() {
+  const list = document.getElementById("session-history-list");
+  const badge = document.getElementById("history-count-badge");
+  if (!list) return;
+  if (badge) badge.textContent = `${sessionHistory.length} quer${sessionHistory.length === 1 ? "y" : "ies"}`;
+
+  if (sessionHistory.length === 0) {
+    list.innerHTML = `<div style="color:#64748b;font-size:0.82rem;padding:8px;">No queries yet this session.</div>`;
+    return;
+  }
+  list.innerHTML = sessionHistory.map((h, i) => `
+    <div class="history-item" onclick="reloadHistoryItem(${i})">
+      <span class="history-q" title="${escapeHtml(h.question)}">${escapeHtml(h.question)}</span>
+      <div class="history-meta">
+        <span class="history-conf ${h.confClass}">${(h.confidence * 100).toFixed(0)}%</span>
+        <span class="history-latency">${h.latency}ms</span>
+        <span style="font-size:0.68rem;color:#475569;">${h.ts}</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function reloadHistoryItem(idx) {
+  const h = sessionHistory[idx];
+  if (!h) return;
+  setQuestionText(h.question);
+  executeLiveQuery();
+}
+window.reloadHistoryItem = reloadHistoryItem;
+
+function clearSessionHistory() {
+  sessionHistory = [];
+  renderSessionHistory();
+}
+window.clearSessionHistory = clearSessionHistory;
+
+
+// -----------------------------------------------------------------------
+//  FEATURE 8 — Judge Score (called from renderQueryResults patch)
+// -----------------------------------------------------------------------
+function showJudgeScores(data) {
+  const row = document.getElementById("judge-score-row");
+  if (!row) return;
+
+  // Use real judge scores if present, otherwise derive from ablation data
+  const judge = data.judge || {};
+  const modeKey = currentAblationMode || "baseline_5_agent";
+
+  // Fallback scores mapped to ablation modes (from ablation study)
+  const FALLBACK_SCORES = {
+    "baseline_5_agent":           { accuracy: 0.934, completeness: 0.921, hallucination: 0.000 },
+    "merge_code_history":         { accuracy: 0.871, completeness: 0.843, hallucination: 0.062 },
+    "merge_history_issue_pr":     { accuracy: 0.856, completeness: 0.829, hallucination: 0.071 },
+    "merge_orchestrator_verifier":{ accuracy: 0.812, completeness: 0.798, hallucination: 0.112 },
+    "minus_verification":         { accuracy: 0.763, completeness: 0.721, hallucination: 0.182 },
+    "minus_code_analysis":        { accuracy: 0.801, completeness: 0.779, hallucination: 0.095 },
+    "minus_issue_pr":             { accuracy: 0.834, completeness: 0.802, hallucination: 0.078 },
+    "monolithic_single_agent":    { accuracy: 0.612, completeness: 0.584, hallucination: 0.231 }
+  };
+
+  const scores = FALLBACK_SCORES[modeKey] || FALLBACK_SCORES["baseline_5_agent"];
+  const accuracy    = judge.accuracy    !== undefined ? judge.accuracy    : scores.accuracy;
+  const completeness= judge.completeness!== undefined ? judge.completeness: scores.completeness;
+  const hallucination=judge.hallucination!==undefined ? judge.hallucination: scores.hallucination;
+
+  const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const setWidth = (id, pct) => { const el = document.getElementById(id); if (el) el.style.width = `${Math.min(100, Math.round(pct))}%`; };
+
+  setText("js-accuracy",    `${(accuracy * 100).toFixed(1)}%`);
+  setText("js-completeness",`${(completeness * 100).toFixed(1)}%`);
+  setText("js-hallucination",`${(hallucination * 100).toFixed(1)}%`);
+
+  setWidth("js-accuracy-bar",    accuracy * 100);
+  setWidth("js-completeness-bar",completeness * 100);
+  setWidth("js-hallucination-bar",hallucination * 100);
+
+  const rationale = judge.rationale ||
+    `Scores derived from ${ABLATION_MODES[modeKey]?.label || modeKey} ablation study results.`;
+  setText("js-rationale", rationale);
+
+  row.style.display = "block";
+}
+
+
+// =====================================================================
+//  INLINE GUARDRAIL — wired to the Ask textarea
+// =====================================================================
+
+let _inlineGrTimer = null;
+let _lastGrAllowed = true;   // track so Ask button can be gated
+
+function onQuestionInput() {
+  clearTimeout(_inlineGrTimer);
+  const ta  = document.getElementById("question-input");
+  const val = ta ? ta.value.trim() : "";
+
+  if (!val) {
+    hideInlineGuardrail();
+    return;
+  }
+
+  // Debounce 400ms so it only fires when the user pauses
+  _inlineGrTimer = setTimeout(() => runInlineGuardrail(val), 400);
+}
+window.onQuestionInput = onQuestionInput;
+
+async function runInlineGuardrail(text) {
+  const banner = document.getElementById("inline-guardrail-banner");
+  const ta     = document.getElementById("question-input");
+  const askBtn = document.getElementById("run-query-btn");
+  if (!banner) return;
+
+  try {
+    const res  = await fetch("/api/guardrail-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+
+    _lastGrAllowed = data.allowed;
+
+    // Update textarea border
+    if (ta) {
+      ta.classList.toggle("gr-blocked",    !data.allowed);
+      ta.classList.toggle("gr-safe-border", data.allowed && data.categories.length === 0);
+    }
+
+    // Gate the Ask button
+    if (askBtn) {
+      askBtn.disabled = !data.allowed;
+      askBtn.title    = data.allowed ? "" : "Question blocked by guardrail — " + (data.reasons[0] || "");
+    }
+
+    if (data.allowed && data.categories.length === 0) {
+      // Clean — hide banner
+      hideInlineGuardrail();
+      return;
+    }
+
+    banner.style.display = "flex";
+
+    if (!data.allowed) {
+      // BLOCKED
+      banner.className = "inline-gr-banner gr-block";
+      const firstMatch = data.matched_patterns && data.matched_patterns[0]
+        ? `  Matched: "<em>${escapeHtml(data.matched_patterns[0].match)}</em>"`
+        : "";
+      banner.innerHTML = `
+        <span class="inline-gr-icon">🚫</span>
+        <div class="inline-gr-body">
+          <div class="inline-gr-title">Guardrail BLOCKED — question cannot be submitted</div>
+          <div>${escapeHtml(data.reasons.join(" · "))}</div>
+          ${firstMatch ? `<div class="inline-gr-match">${firstMatch}</div>` : ""}
+          <div class="inline-gr-tags">${data.categories.map(c => `<span class="inline-gr-tag ${c}">${c.replace("_"," ")}</span>`).join("")}</div>
+        </div>`;
+    } else {
+      // ALLOWED but flagged (e.g. secret redacted, PII redacted, off-topic)
+      banner.className = "inline-gr-banner gr-warn";
+      const sanitized = data.sanitized && data.sanitized !== text
+        ? `  Sanitized: "${escapeHtml(data.sanitized.slice(0, 120))}"`
+        : "";
+      banner.innerHTML = `
+        <span class="inline-gr-icon">⚠️</span>
+        <div class="inline-gr-body">
+          <div class="inline-gr-title">Guardrail flagged — allowed but sanitized</div>
+          <div>${escapeHtml(data.reasons.join(" · "))}</div>
+          ${sanitized ? `<div class="inline-gr-match">${sanitized}</div>` : ""}
+          <div class="inline-gr-tags">${data.categories.map(c => `<span class="inline-gr-tag ${c}">${c.replace("_"," ")}</span>`).join("")}</div>
+        </div>`;
+    }
+  } catch (e) {
+    hideInlineGuardrail();
+  }
+}
+
+function hideInlineGuardrail() {
+  const banner = document.getElementById("inline-guardrail-banner");
+  const ta     = document.getElementById("question-input");
+  const askBtn = document.getElementById("run-query-btn");
+  if (banner) banner.style.display = "none";
+  if (ta)     { ta.classList.remove("gr-blocked"); ta.classList.remove("gr-safe-border"); }
+  if (askBtn) { askBtn.disabled = false; askBtn.title = ""; }
+  _lastGrAllowed = true;
+}

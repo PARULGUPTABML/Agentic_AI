@@ -213,6 +213,20 @@ python3 demo.py
 
 ---
 
+---
+
+## ReadMind agentic layer (Google ADK + CrewAI) — project-review requirements
+
+The `readmind/` package re-implements the agents with **Google ADK** and **CrewAI** only, connected through two
+**MCP** tool servers and the **A2A** protocol, with Pydantic structured output, callback-based monitoring,
+guardrails, tracing/provenance, a ≥40-run evaluation with cost and time, and a deployable API.
+
+* Everything at once on Kaggle: `notebooks/ReadMind_Kaggle.ipynb` (Run All; add the `GEMINI_API_KEY` secret)
+* Design, requirement map and limitations: [`docs/readmind_agentic_system.md`](docs/readmind_agentic_system.md)
+* Install: `pip install -r requirements-readmind.txt` · Tests: `python -m pytest tests -q` · API: `uvicorn readmind.api:app`
+
+---
+
 ## References
 
 1. P. Lewis et al., "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks," NeurIPS, 2020.
