@@ -1,5 +1,5 @@
-# Main requirements for Render deployment
-# Uses hash-based embeddings (EMBED_MODEL=hash) to avoid torch/sentence-transformers
+# Full requirements for Render/Docker deployment
+# EMBED_MODEL=hash avoids torch/sentence-transformers (too large for free tier)
 fastapi==0.115.14
 uvicorn==0.32.1
 pydantic==2.13.5
@@ -13,7 +13,12 @@ pyyaml==6.0.3
 rank-bm25==0.2.2
 numpy==2.0.2
 scikit-learn==1.6.1
-opentelemetry-api==1.41.1
-opentelemetry-sdk==1.41.1
+networkx>=3.0
+tqdm>=4.65
+pydriller>=2.5
 chromadb==1.5.9
 starlette>=0.40.0
+opentelemetry-api==1.41.1
+opentelemetry-sdk==1.41.1
+langchain-core>=0.3.0
+llama-index-core>=0.11.0
