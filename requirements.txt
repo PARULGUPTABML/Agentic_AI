@@ -1,24 +1,40 @@
-# Full requirements for Render/Docker deployment
+# Requirements for Render/Docker deployment
 # EMBED_MODEL=hash avoids torch/sentence-transformers (too large for free tier)
+
+# Core web framework
 fastapi==0.115.14
 uvicorn==0.32.1
+starlette>=0.40.0
 pydantic==2.13.5
 pydantic-settings==2.11.0
 python-dotenv==1.2.1
+
+# LLM / AI
 google-genai==1.47.0
+
+# HTTP
 requests==2.32.5
 httpx==0.28.1
 aiofiles==25.1.0
+
+# Config
 pyyaml==6.0.3
+
+# Retrieval
 rank-bm25==0.2.2
 numpy==2.0.2
 scikit-learn==1.6.1
-networkx>=3.0
-tqdm>=4.65
-pydriller>=2.5
 chromadb==1.5.9
-starlette>=0.40.0
+networkx>=3.0
+
+# Repo analysis
+pydriller>=2.5
+tqdm>=4.65
+
+# Observability
 opentelemetry-api==1.41.1
 opentelemetry-sdk==1.41.1
+
+# Optional framework adapters (lazy-imported, safe to include)
 langchain-core>=0.3.0
 llama-index-core>=0.11.0
